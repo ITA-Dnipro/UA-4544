@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# IDE files
+.idea
+
 # C extensions
 *.so
 
@@ -137,6 +140,7 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+.env.docker
 .venv
 env/
 venv/

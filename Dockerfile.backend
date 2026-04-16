@@ -1,0 +1,30 @@
+FROM python:3.10-slim
+
+# Prevent .pyc files and enable stdout/stderr flushing
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# System deps: pg_isready (used in entrypoint.sh) + curl (healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        postgresql-client \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first (layer cache)
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy Django project source
+COPY backend/ .
+
+# Copy & enable entrypoint (waits for Postgres, runs migrate, starts server)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+
