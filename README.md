@@ -225,7 +225,7 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 
 ### Database Schema
 
-![Database Schema](images/DB_schema.png)
+![Database Schema](images/DB_schema.jpg)
 
 ## Automation & Quality
 
