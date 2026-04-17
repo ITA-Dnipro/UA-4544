@@ -261,6 +261,31 @@ pip install -r startup_gateway/requirements-dev.txt
 
 #### Step 2: Running the linter
 
+Python tools:
+- `black` (format)
+- `isort` (import order)
+- `flake8` (style/lint)
+- `pylint` (deeper static analysis)
+
+Frontend tool:
+- `eslint` (TS/React linting)
+
+
+```bash
+pip install -r backend/requirements-dev.txt
+cd frontend
+npm install
+cd ..
+```
+
+#### Enable git hooks
+
+```bash
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+
 **Action**: To lint and format your staged files, run the following command from the project root:
 
 **Command:**
@@ -275,6 +300,16 @@ Alternatively, if you want to lint and format all files, run:
 
 ```
 pre-commit run --all-files
+```
+
+#### Run individual tools
+
+```bash
+black backend
+isort backend
+flake8 backend
+cd backend && pylint core
+cd frontend && npm run lint
 ```
 
 #### GitHub Actions
@@ -307,7 +342,7 @@ cp env.example .env
 cp backend/env.example backend/.env.docker
 ```
 
-3. **Edit both files and fill in real values.**  
+3. **Edit both files and fill in real values.**
    `.env` and `backend/.env.docker` must **not** be committed to Git — they are included in `.gitignore`.
 ---
 
