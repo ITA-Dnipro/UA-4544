@@ -1,6 +1,8 @@
 # UA-4544
-
-
+![CI Status](https://github.com/ITA-Dnipro/UA-4544/actions/workflows/ci.yml/badge.svg)
+![Codecov](https://codecov.io/gh/ITA-Dnipro/UA-4544/branch/develop/graph/badge.svg)
+![Pylint](https://github.com/ITA-Dnipro/UA-4544/actions/workflows/pylint.yml/badge.svg)
+![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen.svg)
 
 UA-4544 Project-based learning Full Stack Python/React
 
