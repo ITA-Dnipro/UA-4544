@@ -272,7 +272,7 @@ Frontend tool:
 
 
 ```bash
-pip install -r backend/requirements-dev.txt
+pip install -r scalea/requirements-dev.txt
 cd frontend
 npm install
 cd ..
@@ -305,10 +305,10 @@ pre-commit run --all-files
 #### Run individual tools
 
 ```bash
-black backend
-isort backend
-flake8 backend
-cd backend && pylint core
+black scalea
+isort scalea
+flake8 scalea
+cd scalea && pylint core
 cd frontend && npm run lint
 ```
 
@@ -339,11 +339,11 @@ cp env.example .env
 2. **Copy the backend Docker env example:**
 
 ```bash
-cp backend/env.example backend/.env.docker
+cp scalea/env.example scalean/.env.docker
 ```
 
 3. **Edit both files and fill in real values.**
-   `.env` and `backend/.env.docker` must **not** be committed to Git — they are included in `.gitignore`.
+   `.env` and `scalea/.env.docker` must **not** be committed to Git — they are included in `.gitignore`.
 ---
 
 ## Running the Project
