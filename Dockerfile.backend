@@ -13,11 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (layer cache)
-COPY backend/requirements.txt ./requirements.txt
+COPY scalea/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Django project source
-COPY backend/ .
+COPY scalea/ .
 
 # Copy & enable entrypoint (waits for Postgres, runs migrate, starts server)
 COPY entrypoint.sh /entrypoint.sh

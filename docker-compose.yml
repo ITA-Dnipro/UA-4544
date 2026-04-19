@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_DB:       ${DB_NAME:-startup_gateway}
+      POSTGRES_DB:       ${DB_NAME:-scalea}
       POSTGRES_USER:     ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
@@ -50,9 +50,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-      - backend/.env.docker
+      - scalea/.env.docker
     volumes:
-      - ./backend:/app
+      - ./scalea:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -69,21 +69,21 @@ services:
       retries: 3
       start_period: 30s
 
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    restart: unless-stopped
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
-    depends_on:
-      backend:
-        condition: service_healthy
+#  frontend:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile.frontend
+#    restart: unless-stopped
+#    volumes:
+#      - ./frontend:/app
+#      - /app/node_modules
+#    ports:
+#      - "5173:5173"
+#    environment:
+#      - VITE_API_URL=http://localhost:8000
+#    depends_on:
+#      backend:
+#        condition: service_healthy
 
 volumes:
   postgres_data:

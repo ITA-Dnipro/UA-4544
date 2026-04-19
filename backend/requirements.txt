@@ -1,7 +1,0 @@
-django>=4.2,<5.0
-djangorestframework>=3.14
-psycopg2-binary>=2.9
-pymongo>=4.6
-redis>=5.0
-django-cors-headers>=4.3
-python-decouple>=3.8
