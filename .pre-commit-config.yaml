@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^scalea/.*\.py$
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: ^scalea/.*\.py$
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        files: ^scalea/.*\.py$
+        additional_dependencies: [flake8-bugbear==24.8.19]
+
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint (backend)
+        entry: bash -lc 'cd backend && pylint core'
+        language: system
+        pass_filenames: false
+        files: ^scalea/.*\.py$
+
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: bash -lc 'cd frontend && npm run lint'
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+
+  # Optional commit-msg lint (conventional commits)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]

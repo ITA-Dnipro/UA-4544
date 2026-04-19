@@ -261,20 +261,50 @@ pip install -r startup_gateway/requirements-dev.txt
 
 #### Step 2: Running the linter
 
+Python tools:
+- `black` (format)
+- `isort` (import order)
+- `flake8` (style/lint)
+- `pylint` (deeper static analysis)
+
+Frontend tool:
+- `eslint` (TS/React linting)
+
 **Action**: To lint and format your staged files, run the following command from the project root:
+**Step 1**: Install necessary dependencies for both backend and frontend:
+```bash
+pip install -r scalea/requirements-dev.txt
+cd frontend
+npm install
+cd ..
+```
 
-**Command:**
+**Step 2**: Enable git commit hooks
 
+```bash
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+
+**Action**: To lint and format your staged files, run the following command from the project root:
 ```
 pre-commit run
 ```
 
 Alternatively, if you want to lint and format all files, run:
-
-**Command:**
-
 ```
 pre-commit run --all-files
+```
+
+#### Run individual tools
+
+```bash
+black scalea
+isort scalea
+flake8 scalea
+cd scalea && pylint core
+cd frontend && npm run lint
 ```
 
 #### GitHub Actions
