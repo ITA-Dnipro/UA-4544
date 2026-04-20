@@ -248,7 +248,7 @@ Dependabot is enabled for:
 **Command:**
 
 ```
-pip install -r startup_gateway/requirements.txt
+pip install -r scalea/requirements.txt
 ```
 
 For developers, there is an additional layer of dependencies to install.
@@ -256,12 +256,28 @@ For developers, there is an additional layer of dependencies to install.
 **Command:**
 
 ```
-pip install -r startup_gateway/requirements-dev.txt
+pip install -r scalea/requirements-dev.txt
 ```
 
 #### Step 2: Running the linter
 
+This project uses [Ruff](https://docs.astral.sh/ruff/) as the single tool for:
+- linting
+- import sorting
+- formatting
+
+Pre-commit hooks are configured to run Ruff on staged files before each commit.
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
 **Action**: To lint and format your staged files, run the following command from the project root:
+```bash
+ruff check .
+ruff check . --fix
+ruff format .
+```
 
 **Command:**
 

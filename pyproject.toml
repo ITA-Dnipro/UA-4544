@@ -1,0 +1,46 @@
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "node_modules",
+  "migrations",
+]
+
+[tool.ruff.lint]
+# Core + useful strictness for backend projects
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "W",    # pycodestyle warnings
+  "I",    # import sorting
+  "B",    # flake8-bugbear
+  "UP",   # pyupgrade
+  "C90",  # mccabe complexity
+  "SIM",  # simplify
+  "RET",  # return consistency
+  "ARG",  # unused arguments
+  "PTH",  # pathlib suggestions
+  "RUF",  # ruff-native rules
+]
+ignore = [
+  "E501",   # line length handled by formatter
+  "RUF012", # mutable class attrs (can be noisy in Django patterns)
+]
+
+# Cyclomatic complexity threshold
+mccabe.max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# Django migration files are auto-generated
+"**/migrations/*.py" = ["E501", "F401", "F841", "ARG001"]
+# Tests often use unused args/fixtures and looser assertions
+"**/tests/*.py" = ["ARG001", "S101"]
+"manage.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "auto"
