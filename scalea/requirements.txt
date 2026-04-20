@@ -1,5 +1,5 @@
-django
-djangorestframework
-django-cors-headers
-python-decouple
-psycopg2-binary
+Django==4.2.30
+djangorestframework==3.17.1
+django-cors-headers==4.9.0
+python-decouple==3.8
+psycopg2-binary==2.9.11
