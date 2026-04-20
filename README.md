@@ -295,39 +295,46 @@ This project provides a containerized environment for consistent development acr
 
 ## Environment Variables
 
-1. **Create your local `.env.docker` file** from the example:
+1. **Copy the root `.env` example:**
 
 ```bash
-cd startup_gateway
-cp env.example .env.docker
+cp env.example .env
 ```
 
-2. **Edit .env.docker and fill in your real values.**
-   .env.docker must not be committed to Git. It is included in .gitignore.
-   env.example is safe to commit and serves as a template for your team.
+2. **Copy the backend Docker env example:**
+
+```bash
+cp backend/env.example backend/.env.docker
+```
+
+3. **Edit both files and fill in real values.**  
+   `.env` and `backend/.env.docker` must **not** be committed to Git — they are included in `.gitignore`.
+---
 
 ## Running the Project
 
-1. Build and start all services
+### Step 1 — Build and start all services
 
-docker-compose up --build -d
+```bash
+docker-compose up --build
+```
 
-This will start:
-backend (Django)
-frontend (React in dev mode)
-db (Postgres)
-redis (optional, for channels/notifications)
+This will build images and start the following services:
 
-2. Create Django superuser
+| Service    | Description                        | Port  |
+|------------|------------------------------------|-------|
+| `db`       | PostgreSQL 15                      | 5432  |
+| `redis`    | Redis 7 (channels / notifications) | 6379  |
+| `mongo`    | MongoDB 7.0                        | 27017 |
+| `backend`  | Django REST Framework (dev)        | 8000  |
+| `frontend` | React + Vite (dev mode)            | 5173  |
 
-docker-compose exec backend python manage.py createsuperuser
 
-Follow the prompts to set username, email, and password.
+## Stopping the Containers
 
-This superuser can log into the admin panel at http://localhost:8000/admin.
+Stop all running containers (preserves volumes):
 
-3. Stopping the Containers
-
-To stop and remove containers:
-
+```bash
 docker-compose down
+```
+---
