@@ -337,4 +337,10 @@ Stop all running containers (preserves volumes):
 ```bash
 docker-compose down
 ```
+
+Stop all running containers (remove volumes):
+
+```bash
+docker-compose down -v
+```
 ---
