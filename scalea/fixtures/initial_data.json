@@ -1,0 +1,80 @@
+[
+  {
+    "model": "users.user",
+    "pk": 1,
+    "fields": {
+      "password": "startup",
+      "username": "startup_user",
+      "email": "startup@example.com",
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true,
+      "is_startup": true,
+      "is_investor": false,
+      "is_verified": true,
+      "groups": [],
+      "user_permissions": [],
+      "created_at": "2026-04-21T10:00:00Z",
+      "updated_at": "2026-04-21T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.user",
+    "pk": 2,
+    "fields": {
+      "password": "investor",
+      "username": "investor_user",
+      "email": "investor@example.com",
+      "is_superuser": false,
+      "is_staff": false,
+      "is_active": true,
+      "is_startup": false,
+      "is_investor": true,
+      "is_verified": true,
+      "groups": [],
+      "user_permissions": [],
+      "created_at": "2026-04-21T10:00:00Z",
+      "updated_at": "2026-04-21T10:00:00Z"
+    }
+  },
+  {
+    "model": "startups.startupprofile",
+    "pk": 1,
+    "fields": {
+      "user": 1,
+      "company_name": "Startup One",
+      "description": "AI platform for startup-investor matching.",
+      "website": "https://startup-one.example.com",
+      "created_at": "2026-04-21T10:00:00Z",
+      "updated_at": "2026-04-21T10:00:00Z"
+    }
+  },
+  {
+    "model": "investors.investorprofile",
+    "pk": 1,
+    "fields": {
+      "user": 2,
+      "company_name": "Investor One",
+      "bio": "Angel investor focused on early-stage startups.",
+      "investment_focus": "AI, SaaS, Fintech",
+      "website": "https://investor-one.example.com",
+      "created_at": "2026-04-21T10:00:00Z",
+      "updated_at": "2026-04-21T10:00:00Z"
+    }
+  },
+  {
+    "model": "projects.project",
+    "pk": 1,
+    "fields": {
+      "startup": 1,
+      "status": true,
+      "title": "AI Matching Platform",
+      "short_description": "Platform connecting startups with investors.",
+      "description": "A platform that helps startups find relevant investors using AI-based matching.",
+      "funding_goal": "500000",
+      "current_funding": "100000",
+      "created_at": "2026-04-21T10:00:00Z",
+      "updated_at": "2026-04-21T10:00:00Z"
+    }
+  }
+]
