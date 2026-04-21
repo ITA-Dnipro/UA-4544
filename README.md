@@ -227,7 +227,7 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 
 ### Database Schema
 
-![Database Schema](images/DB_schema.jpg)
+![Database Schema](docs/images/DB_schema.jpg)
 
 ## Automation & Quality
 
@@ -250,7 +250,7 @@ Dependabot is enabled for:
 **Command:**
 
 ```
-pip install -r startup_gateway/requirements.txt
+pip install -e .
 ```
 
 For developers, there is an additional layer of dependencies to install.
@@ -258,12 +258,29 @@ For developers, there is an additional layer of dependencies to install.
 **Command:**
 
 ```
-pip install -r startup_gateway/requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 #### Step 2: Running the linter
+Install packages from the `dev` extras to get access to the linter and formatter.
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) as the single tool for:
+- linting
+- import sorting
+- formatting
+
+Pre-commit hooks are configured to run Ruff on staged files before each commit.
+```bash
+pre-commit install
+pre-commit run --all-files
+```
 
 **Action**: To lint and format your staged files, run the following command from the project root:
+```bash
+ruff check .
+ruff check . --fix
+ruff format .
+```
 
 **Command:**
 
@@ -338,5 +355,11 @@ Stop all running containers (preserves volumes):
 
 ```bash
 docker-compose down
+```
+
+Stop all running containers (remove volumes):
+
+```bash
+docker-compose down -v
 ```
 ---
