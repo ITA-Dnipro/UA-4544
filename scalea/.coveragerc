@@ -1,0 +1,15 @@
+[run]
+source = .
+omit =
+    *manage.py
+    *settings.py
+    *wsgi.py
+    *asgi.py
+    *migrations*
+    *tests*
+    *.venv*
+    *__init__*
+
+[report]
+show_missing = True
+skip_covered = True
