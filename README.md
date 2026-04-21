@@ -225,7 +225,7 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 
 ### Database Schema
 
-![Database Schema](images/DB_schema.jpg)
+![Database Schema](docs/images/DB_schema.jpg)
 
 ## Automation & Quality
 
@@ -248,7 +248,7 @@ Dependabot is enabled for:
 **Command:**
 
 ```
-pip install -r scalea/requirements.txt
+pip install -e .
 ```
 
 For developers, there is an additional layer of dependencies to install.
@@ -256,10 +256,11 @@ For developers, there is an additional layer of dependencies to install.
 **Command:**
 
 ```
-pip install -r scalea/requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 #### Step 2: Running the linter
+Install packages from the `dev` extras to get access to the linter and formatter.
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) as the single tool for:
 - linting
