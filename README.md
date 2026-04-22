@@ -111,7 +111,7 @@ PASSWORD_RESET_TIMEOUT = 3600  # 1 hour
 # Email configuration
 DEFAULT_FROM_EMAIL = 'no-reply@startup-gateway.com'
 SITE_NAME = 'Startup Gateway'
-FRONTEND_URL = 'http://localhost:3000'
+FRONTEND_URL = 'http://localhost:5173'
 
 # Throttling
 REST_FRAMEWORK = {
@@ -321,11 +321,18 @@ cp env.example .env
 2. **Copy the backend Docker env example:**
 
 ```bash
-cp backend/env.example backend/.env.docker
+cp scalea/.env.example scalea/.env.docker
 ```
 
-3. **Edit both files and fill in real values.**  
-   `.env` and `backend/.env.docker` must **not** be committed to Git — they are included in `.gitignore`.
+3. **Copy the frontend Docker env example:**
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+
+4. **Edit all files and fill in real values.**  
+   `.env` and `scalea/.env.docker` and `frontend/.env` must **not** be committed to Git — they are included in `.gitignore`.
 ---
 
 ## Running the Project
@@ -360,4 +367,3 @@ Stop all running containers (remove volumes):
 ```bash
 docker-compose down -v
 ```
----

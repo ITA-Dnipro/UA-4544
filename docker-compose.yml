@@ -64,29 +64,28 @@ services:
       mongo:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000 || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
-#  frontend:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile.frontend
-#    restart: unless-stopped
-#    volumes:
-#      - ./frontend:/app
-#      - /app/node_modules
-#    ports:
-#      - "5173:5173"
-#    environment:
-#      - VITE_API_URL=http://localhost:8000
-#    depends_on:
-#      backend:
-#        condition: service_healthy
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    env_file:
+      - frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   mongo_data:
-

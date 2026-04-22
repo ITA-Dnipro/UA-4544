@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (layer cache)
-COPY scalea/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
 
 # Copy Django project source
 COPY scalea/ .
@@ -26,5 +26,3 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-
-
