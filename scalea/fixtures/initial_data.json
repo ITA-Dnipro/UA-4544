@@ -3,7 +3,7 @@
     "model": "users.user",
     "pk": 1,
     "fields": {
-      "password": "startup",
+      "password": "pbkdf2_sha256$600000$Sxwa9mE14AVxo3yCKftrqW$D3JnumBY3Lc19JwP39aKoc4IbaNGqW7/D0OPwr4bUcY=",
       "username": "startup_user",
       "email": "startup@example.com",
       "is_superuser": false,
@@ -22,7 +22,7 @@
     "model": "users.user",
     "pk": 2,
     "fields": {
-      "password": "investor",
+      "password": "pbkdf2_sha256$600000$YJ9PdItcHrVPt1RkrXNCiG$jGNIF+R6GhUUrR0RCSHYFlf9+m+e10KEwzgHGggFuVo=",
       "username": "investor_user",
       "email": "investor@example.com",
       "is_superuser": false,
