@@ -115,13 +115,13 @@ select.inputBase {
   padding-right: 40px;
 }
 
-.forgotLinkContainer {
+.forgotPasswordWrapper {
   display: flex;
   justify-content: flex-end;
   margin-top: 0.5rem;
 }
 
-.forgotLink {
+.forgotPasswordLink {
   font-size: 0.8rem;
   font-weight: 700;
   color: #0F172A;

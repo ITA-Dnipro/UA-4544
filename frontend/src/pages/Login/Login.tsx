@@ -25,7 +25,7 @@ const LoginPage: React.FC = () => {
     formState: { errors },
   } = useForm<ILoginForm>({
     mode: "onBlur",
-    defaultValues: { role: "user", rememberMe: false },
+    defaultValues: { role: "startup", rememberMe: false },
   });
 
   const watchedFields = watch();
