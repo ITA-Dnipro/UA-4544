@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import { Loader2, Eye, EyeOff, ChevronDown } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import styles from "./Login.module.css";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 interface ILoginForm {
   email: string;
@@ -46,10 +47,11 @@ const LoginPage: React.FC = () => {
     setServerError(null);
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      console.log("Дані форми:", data);
       navigate("/");
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Помилка сервера");
+      setServerError(
+        err instanceof Error ? err.message : "Server error occurred",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +61,7 @@ const LoginPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Вхід на платформу</h1>
+          <h1 className={styles.title}>Login to Platform</h1>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
@@ -68,16 +70,19 @@ const LoginPage: React.FC = () => {
           )}
 
           <div>
-            <label className={styles.label}>Електронна пошта</label>
+            <label htmlFor="email-input" className={styles.label}>
+              Email Address
+            </label>
             <input
+              id="email-input"
               type="email"
-              placeholder="Введіть email"
+              placeholder="Enter your email"
               className={getFieldClassName("email")}
               {...register("email", {
-                required: "Обов'язкове поле",
+                required: "Email is required",
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Невірний формат",
+                  message: "Invalid email format",
                 },
               })}
             />
@@ -87,21 +92,28 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className={styles.label}>Пароль</label>
+            <label htmlFor="password-input" className={styles.label}>
+              Password
+            </label>
             <div className={styles.passwordWrapper}>
               <input
+                id="password-input"
                 type={showPassword ? "text" : "password"}
-                placeholder="Введіть пароль"
+                placeholder="Enter your password"
                 className={getFieldClassName("password")}
                 {...register("password", {
-                  required: "Пароль обов'язковий",
-                  minLength: { value: 6, message: "Мінімум 6 символів" },
+                  required: "Password is required",
+                  minLength: {
+                    value: 6,
+                    message: "Minimum 6 characters required",
+                  },
                 })}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className={styles.eyeButton}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -112,27 +124,32 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className={styles.label}>Роль користувача</label>
+            <label htmlFor="role-select" className={styles.label}>
+              User Role
+            </label>
             <div className={styles.passwordWrapper}>
               <select
+                id="role-select"
                 className={getFieldClassName("role")}
                 {...register("role")}
               >
-                <option value="user">Користувач</option>
-                <option value="admin">Стартап</option>
-                <option value="investor">Інвестор</option>
+                <option value="startup">Startup</option>
+                <option value="investor">Investor</option>
               </select>
             </div>
           </div>
-
-          <div className={styles.checkboxContainer}>
-            <label className={styles.checkboxLabel}>
-              <input type="checkbox" {...register("rememberMe")} />
-              <span>Запам'ятати мене</span>
-            </label>
-            <a href="/forgot-password" className={styles.forgotLink}>
-              Забули пароль?
-            </a>
+          <div className={styles.optionsRow}>
+            <div className={styles.checkboxContainer}>
+              <label className={styles.checkboxLabel}>
+                <input type="checkbox" {...register("rememberMe")} />
+                <span>Remember me</span>
+              </label>
+            </div>
+            <div className={styles.forgotPasswordWrapper}>
+              <Link to="/password-reset" className={styles.forgotPasswordLink}>
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button
@@ -141,19 +158,19 @@ const LoginPage: React.FC = () => {
             className={`${styles.submitButton} ${isLoading ? styles.btnDisabled : styles.btnIdle}`}
           >
             {isLoading ? (
-              <Loader2 className="animate-spin mr-2" size={18} />
+              <Loader2 className={styles.spinner} size={18} />
             ) : (
-              "Увійти"
+              "Log In"
             )}
           </button>
         </form>
       </div>
 
       <p className={styles.footerText}>
-        Вперше тут?{" "}
-        <a href="/register" className={styles.registerLink}>
-          Зареєструйтесь
-        </a>
+        New here?{" "}
+        <Link to="/register" className={styles.registerLink}>
+          Create an account
+        </Link>
       </p>
     </div>
   );

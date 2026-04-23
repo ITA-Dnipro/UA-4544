@@ -5,6 +5,8 @@ import Register from "../pages/Register";
 import StartupView from "../pages/StartupView";
 import InvestorDashboard from "../pages/InvestorDashboard";
 import Inbox from "../pages/Inbox";
+import PasswordResetRequest from "../pages/PasswordReset/PasswordResetRequest";
+import PasswordResetConfirm from "../pages/PasswordReset/PasswordResetConfirm";
 
 export default function AppRouter() {
   return (
@@ -16,6 +18,8 @@ export default function AppRouter() {
         <Route path="/startups/:id" element={<StartupView />} />
         <Route path="/dashboard" element={<InvestorDashboard />} />
         <Route path="/messages" element={<Inbox />} />
+        <Route path="/password-reset" element={<PasswordResetRequest />} />
+        <Route path="/reset-password" element={<PasswordResetConfirm />} />
       </Routes>
     </BrowserRouter>
   );
