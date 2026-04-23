@@ -18,10 +18,11 @@ Including another URLconf
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
+
 from dashboard.views import LandingContentAPIView
 
 
-def health_check(request):
+def health_check(_request):
     return JsonResponse({"status": "ok"})
 
 

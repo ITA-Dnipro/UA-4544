@@ -1,10 +1,9 @@
-from django.shortcuts import render
-from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 
 class LandingContentAPIView(APIView):
-    def get(self, request):
+    def get(self, _request):
         return Response({
             "hero": {
                 "title": "Connect startups with investors",
