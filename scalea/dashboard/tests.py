@@ -1,4 +1,3 @@
-from django.test import TestCase
 
 
 class LandingContentTest(TestCase):
