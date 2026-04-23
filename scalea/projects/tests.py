@@ -23,17 +23,20 @@ class ProjectModelTests(TestCase):
             website="https://www.startupcompany.com",
         )
 
+        
+
         project = Project.objects.create(
             startup=startup_profile,
-            status=True,
             title="AI Matching Platform",
-            short_description="Platform connecting startups with investors.",
-            description="Detailed project description.",
-            funding_goal=500000,
-            current_funding=100000,
+            slug="my-project",
+            short_description="Short description",
+            description="Platform connecting startups with investors",
+            target_amount=500000
         )
 
+        self.assertEqual(Project.objects.count(), 1)
         self.assertEqual(project.startup, startup_profile)
         self.assertEqual(project.title, "AI Matching Platform")
-        self.assertTrue(project.status)
-        self.assertEqual(project.current_funding, 100000)
+        self.assertEqual(project.slug, "my-project")
+        self.assertEqual(project.raised_amount, 0)
+        self.assertEqual(project.currency, "UAH")       
