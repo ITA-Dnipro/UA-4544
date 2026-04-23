@@ -1,8 +1,8 @@
 from django.test import TestCase
-
-from projects.models import Project
 from startups.models import StartupProfile
 from users.models import User
+
+from projects.models import Project
 
 
 class ProjectModelTests(TestCase):

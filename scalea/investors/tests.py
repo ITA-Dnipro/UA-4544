@@ -1,8 +1,8 @@
 from django.test import TestCase
-
-from investors.models import InvestorProfile, SavedStartup
 from startups.models import StartupProfile
 from users.models import User
+
+from investors.models import InvestorProfile, SavedStartup
 
 
 class InvestorProfileModelTests(TestCase):
