@@ -1,7 +1,8 @@
 import pytest
 from django.contrib.auth import get_user_model
-from startups.models import StartupProfile, Project
+from startups.models import StartupProfile
 from investors.models import InvestorProfile, Investment
+from projects.models import Project
 
 User = get_user_model()
 
