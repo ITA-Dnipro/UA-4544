@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #F8F7F4; 
+  padding: 20px;
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px; 
+  background-color: white;
+  border-radius: 4px; 
+  box-shadow: 0px 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #EAECEF;
+  box-sizing: border-box;
+}
+
+.header {
+  padding: 2rem 2rem 1.5rem 2rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #06152B;
+  margin: 0;
+}
+
+.form {
+  padding: 0 2rem 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.inputBase {
+  width: 100%;
+  padding: 12px 14px; 
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  outline: none;
+  box-sizing: border-box;
+  display: block;
+  border: 1px solid #D1D5DB;
+  color: #1E293B;
+}
+
+.inputBase::placeholder {
+  color: #94A3B8;
+}
+
+.inputDefault:focus {
+  border-color: #0F172A; 
+  box-shadow: 0 0 0 1px #0F172A;
+}
+
+.inputError {
+  border: 1px solid #EF4444;
+  background-color: #FFF7F7;
+}
+
+.inputSuccess {
+  border: 1px solid #10B981;
+  background-color: #F0FDF4;
+}
+
+.errorText {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: #EF4444;
+}
+
+.passwordWrapper, .selectWrapper {
+  position: relative;
+}
+
+.eyeButton {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.selectIcon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+select.inputBase {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 40px;
+}
+
+.forgotLinkContainer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.forgotLink {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0F172A;
+  text-decoration: none;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+.checkboxContainer {
+  display: flex;
+  align-items: center;
+  margin-top: -0.5rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.875rem;
+  color: #475569;
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 0.5rem;
+}
+
+.btnIdle {
+  background-color: #E2E8F0;
+  color: #475569;
+}
+
+.btnIdle:hover {
+  background-color: #CBD5E1;
+}
+
+.btnDisabled {
+  background-color: #F1F5F9;
+  color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.footerText {
+  margin-top: 2rem;
+  font-size: 0.875rem;
+  color: #64748B;
+  text-align: center;
+}
+
+.registerLink {
+  font-weight: 700;
+  color: #0F172A;
+  text-decoration: none;
+}
+
+.registerLink:hover {
+  text-decoration: underline;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+:global(body), :global(html) {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+

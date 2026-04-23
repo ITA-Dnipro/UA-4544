@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Home from '../pages/Home'
-import Login from '../pages/Login'
-import Register from '../pages/Register'
-import StartupView from '../pages/StartupView'
-import InvestorDashboard from '../pages/InvestorDashboard'
-import Inbox from '../pages/Inbox'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "../pages/Home";
+import Login from "../pages/Login/Login";
+import Register from "../pages/Register";
+import StartupView from "../pages/StartupView";
+import InvestorDashboard from "../pages/InvestorDashboard";
+import Inbox from "../pages/Inbox";
 
 export default function AppRouter() {
   return (
@@ -18,6 +18,5 @@ export default function AppRouter() {
         <Route path="/messages" element={<Inbox />} />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
-
