@@ -1,7 +1,9 @@
 from django.test import TestCase
+from users.models import User
 
 from startups.models import StartupProfile
 from users.models import User
+
 
 
 class StartupProfileModelTests(TestCase):
