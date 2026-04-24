@@ -15,16 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 
 
-def health_check():
-    return JsonResponse({'status': 'ok'})
+def health_check(_request):
+    return JsonResponse({"status": "ok"})
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/health/', health_check),
+    path("admin/", admin.site.urls),
+    path("api/health/", health_check),
+    path("api/content/landing/", LandingContentAPIView.as_view()),
 ]
