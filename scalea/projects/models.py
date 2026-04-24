@@ -31,7 +31,6 @@ class Project(models.Model):
         max_length=32,
         choices=ProjectStatus.choices,
         default=ProjectStatus.IDEA,
-        db_index=True,  # optional; helps filter lists
     )    
     target_amount = models.DecimalField(max_digits=14, decimal_places=2)
     raised_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
