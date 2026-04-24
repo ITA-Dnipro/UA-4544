@@ -253,7 +253,7 @@ To enable coverage upload:
 
 **Command:**
 
-```
+```bash
 pip install -e .
 ```
 
@@ -261,7 +261,7 @@ For developers, there is an additional layer of dependencies to install.
 
 **Command:**
 
-```
+```bash
 pip install -e ".[dev]"
 ```
 
@@ -273,31 +273,32 @@ This project uses:
 - **ESLint** for TypeScript/React linting (frontend)
 
 ##### Backend (Python) — Ruff
+(From project root)
 
-From project root:
-**Action**: To lint and format your staged files, run the following command from the project root:
+To lint and format your staged files, run the following command from the project root:
 ```bash
 ruff check .
 ruff check . --fix
 ruff format .
 ```
 
-##### Frontend (React) — eslint
-From `frontend` directory:
-**Action**: To lint and format your staged files, run the following command from the `
+##### Frontend (React) — ESLint
+(From `frontend` directory)
+
+To lint and format your staged files, run the following command:
 ```bash
 npm install
 npm run lint
 npm run lint:fix
 ```
 
-##### Install & Run per-commit
+##### Install & Run pre-commit
 **Command:**
-```
+```bash
 pre-commit install
 ```
 
-```
+```bash
 pre-commit run
 ```
 
@@ -305,13 +306,13 @@ Alternatively, if you want to lint and format all files, run:
 
 **Command:**
 
-```
+```bash
 pre-commit run --all-files
 ```
 
 Run specific hooks:
 **Command:**
-```
+```bash
 pre-commit run ruff-check --all-files
 pre-commit run ruff-format --all-files
 pre-commit run frontend-eslint --all-files
