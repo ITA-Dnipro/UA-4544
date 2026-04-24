@@ -1,18 +1,20 @@
-from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
+from django.db import transaction
+from investors.models import InvestorProfile
 from rest_framework import serializers, status
 from rest_framework.exceptions import APIException
 from startups.models import StartupProfile
-from investors.models import InvestorProfile
 
 User = get_user_model()
+
 
 class DuplicateEmailError(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = 'A user with this email already exists.'
     default_code = 'duplicate_email'
+
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -22,7 +24,9 @@ class RegisterSerializer(serializers.Serializer):
     short_pitch = serializers.CharField(required=False, allow_blank=True, default='')
     website = serializers.URLField(required=False, allow_blank=True, default='')
     bio = serializers.CharField(required=False, allow_blank=True, default='')
-    investment_focus = serializers.CharField(required=False, allow_blank=True, default='')
+    investment_focus = serializers.CharField(
+        required=False, allow_blank=True, default=''
+    )
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -33,7 +37,7 @@ class RegisterSerializer(serializers.Serializer):
         try:
             validate_password(value)
         except exceptions.ValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
+            raise serializers.ValidationError(list(e.messages)) from e
         return value
 
     @transaction.atomic
@@ -48,7 +52,7 @@ class RegisterSerializer(serializers.Serializer):
             password=password,
             is_active=False,
             is_startup=(role == 'startup'),
-            is_investor=(role == 'investor')
+            is_investor=(role == 'investor'),
         )
 
         if role == 'startup':
@@ -56,14 +60,14 @@ class RegisterSerializer(serializers.Serializer):
                 user=user,
                 company_name=validated_data.get('company_name', ''),
                 description=validated_data.get('short_pitch', ''),
-                website=validated_data.get('website', '')
+                website=validated_data.get('website', ''),
             )
         else:
             InvestorProfile.objects.create(
                 user=user,
                 company_name=validated_data.get('company_name', ''),
                 bio=validated_data.get('bio', ''),
-                investment_focus=validated_data.get('investment_focus', '')
+                investment_focus=validated_data.get('investment_focus', ''),
             )
 
         self.send_verification_email(user)

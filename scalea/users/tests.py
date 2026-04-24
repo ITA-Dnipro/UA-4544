@@ -1,11 +1,10 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
-from users.models import User
 from django.urls import reverse
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient
-from django.contrib.auth import get_user_model
 from startups.models import StartupProfile
-from investors.models import InvestorProfile
 
 User = get_user_model()
 
@@ -13,16 +12,16 @@ User = get_user_model()
 class UserModelTests(TestCase):
     def test_user_creation_with_role_flags(self):
         user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
-            password="123qwe!@#",
+            username='testuser',
+            email='test@example.com',
+            password='123qwe!@#',
             is_startup=True,
             is_investor=False,
             is_verified=True,
         )
 
-        self.assertEqual(user.username, "testuser")
-        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.username, 'testuser')
+        self.assertEqual(user.email, 'test@example.com')
         self.assertTrue(user.is_startup)
         self.assertFalse(user.is_investor)
         self.assertTrue(user.is_verified)
@@ -33,47 +32,53 @@ class RegistrationAPITests(TestCase):
         self.client = APIClient()
         self.url = reverse('register')
         self.valid_startup_data = {
-            "email": "startup@example.com",
-            "password": "StrongPassword123!",
-            "role": "startup",
-            "company_name": "Tech Future",
-            "short_pitch": "We build AI solutions."
+            'email': 'startup@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'startup',
+            'company_name': 'Tech Future',
+            'short_pitch': 'We build AI solutions.',
         }
 
     def test_successful_startup_registration(self):
         response = self.client.post(self.url, self.valid_startup_data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(User.objects.filter(email="startup@example.com").exists())
-        self.assertTrue(StartupProfile.objects.filter(company_name="Tech Future").exists())
+        self.assertTrue(User.objects.filter(email='startup@example.com').exists())
+        self.assertTrue(
+            StartupProfile.objects.filter(company_name='Tech Future').exists()
+        )
 
-        user = User.objects.get(email="startup@example.com")
+        user = User.objects.get(email='startup@example.com')
         self.assertFalse(user.is_active)
 
     def test_successful_investor_registration(self):
         data = {
-            "email": "investor@example.com",
-            "password": "StrongPassword123!",
-            "role": "investor",
-            "bio": "Experienced angel investor.",
-            "investment_focus": "SaaS"
+            'email': 'investor@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'investor',
+            'bio': 'Experienced angel investor.',
+            'investment_focus': 'SaaS',
         }
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(InvestorProfile.objects.filter(user__email="investor@example.com").exists())
+        self.assertTrue(
+            InvestorProfile.objects.filter(user__email='investor@example.com').exists()
+        )
 
     def test_registration_duplicate_email_returns_409(self):
         User.objects.create_user(
-            username="startup@example.com",
-            email="startup@example.com",
-            password="Password123!"
+            username='startup@example.com',
+            email='startup@example.com',
+            password='Password123!',
         )
 
         response = self.client.post(self.url, self.valid_startup_data)
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
-        self.assertEqual(response.data['detail'], 'A user with this email already exists.')
+        self.assertEqual(
+            response.data['detail'], 'A user with this email already exists.'
+        )
 
     def test_registration_weak_password_returns_400(self):
         data = self.valid_startup_data.copy()
