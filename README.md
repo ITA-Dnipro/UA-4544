@@ -268,17 +268,13 @@ pip install -e ".[dev]"
 #### Step 2: Running the linter
 Install packages from the `dev` extras to get access to the linter and formatter.
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) as the single tool for:
-- linting
-- import sorting
-- formatting
+This project uses:
+- **Ruff** for Python linting/formatting (backend)
+- **ESLint** for TypeScript/React linting (frontend)
 
-Pre-commit hooks are configured to run Ruff on staged files before each commit.
-```bash
-pre-commit install
-pre-commit run --all-files
-```
+##### Backend (Python) — Ruff
 
+From project root:
 **Action**: To lint and format your staged files, run the following command from the project root:
 ```bash
 ruff check .
@@ -286,7 +282,20 @@ ruff check . --fix
 ruff format .
 ```
 
+##### Frontend (React) — eslint
+From `frontend` directory:
+**Action**: To lint and format your staged files, run the following command from the `
+```bash
+npm install
+npm run lint
+npm run lint:fix
+```
+
+##### Install & Run per-commit
 **Command:**
+```
+pre-commit install
+```
 
 ```
 pre-commit run
@@ -298,6 +307,14 @@ Alternatively, if you want to lint and format all files, run:
 
 ```
 pre-commit run --all-files
+```
+
+Run specific hooks:
+**Command:**
+```
+pre-commit run ruff-check --all-files
+pre-commit run ruff-format --all-files
+pre-commit run frontend-eslint --all-files
 ```
 
 #### GitHub Actions
