@@ -66,7 +66,7 @@ class Project(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug and self.title:
-            base = slugify(self.title) or "project"  
+            base = slugify(self.title) or "project"
             slug = base
             n = 2
             while type(self).objects.filter(slug=slug).exclude(pk=self.pk).exists():
