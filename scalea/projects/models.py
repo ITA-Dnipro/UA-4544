@@ -2,8 +2,8 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import models
 from django.core.validators import MinValueValidator
+from django.db import models
 from django.utils.text import slugify
 
 
@@ -36,13 +36,13 @@ class Project(models.Model):
         default=ProjectStatus.IDEA,
     )
     target_amount = models.DecimalField(
-        max_digits=14, 
+        max_digits=14,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))]
     )
     raised_amount = models.DecimalField(
-        max_digits=14, 
-        decimal_places=2, 
+        max_digits=14,
+        decimal_places=2,
         default=Decimal("0"),
         validators=[MinValueValidator(Decimal("0"))]
     )
@@ -63,7 +63,7 @@ class Project(models.Model):
 
     def __str__(self):
         return self.title
-    
+
     def save(self, *args, **kwargs):
         if not self.slug and self.title:
             base = slugify(self.title) or "project"  # slugify("") -> ""
@@ -98,7 +98,7 @@ class ProjectAudit(models.Model):
         ]
 
     def __str__(self):
-        return f"Audit<{self.project_id} @ {self.timestamp:%Y-%m-%d %H:%M:%S}>"    
+        return f"Audit<{self.project_id} @ {self.timestamp:%Y-%m-%d %H:%M:%S}>"
 
 
 # TODO (olgagnatenko13): add ProjectAttachment implementation
