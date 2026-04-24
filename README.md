@@ -1,6 +1,8 @@
 # UA-4544
-
-
+![CI Status](https://github.com/ITA-Dnipro/UA-4544/actions/workflows/ci.yml/badge.svg)
+![Codecov](https://codecov.io/gh/ITA-Dnipro/UA-4544/branch/develop/graph/badge.svg)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen.svg)
 
 UA-4544 Project-based learning Full Stack Python/React
 
@@ -230,16 +232,20 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 ## Automation & Quality
 
 ### Code Coverage
-Project uses Codecov for coverage reporting.
+Project uses **Codecov** to monitor test coverage and ensure code reliability.
+
+* **Automation:** Coverage is uploaded automatically as part of the CI pipeline
+* **Setup:** CI includes a Codecov upload step.
+
 To enable coverage upload:
-1. Create `CODECOV_TOKEN` in GitHub Secrets
-2. Run CI pipeline
+1. Add `CODECOV_TOKEN` to **Settings > Secrets and variables > Actions**.
+2. Run the CI pipeline
 
 ### Dependabot
-Dependabot is enabled for:
-- GitHub Actions
-- Python (pip)
-- Frontend dependencies (npm)
+**Dependabot** is enabled to keep dependencies up to date and secure. It monitors:
+* **GitHub Actions** (CI/CD workflows)
+* **Python** (pip)
+* **Frontend** (npm packages)
 
 #### Step 1: Installation
 
