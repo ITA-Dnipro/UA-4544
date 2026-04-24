@@ -21,10 +21,10 @@ from django.urls import path
 
 
 def health_check():
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({'status': 'ok'})
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api/health/", health_check),
+    path('admin/', admin.site.urls),
+    path('api/health/', health_check),
 ]

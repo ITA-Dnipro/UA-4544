@@ -17,7 +17,7 @@ class InvestorProfile(models.Model):
 
 class Investment(models.Model):
     investor_profile = models.ForeignKey(InvestorProfile, on_delete=models.CASCADE)
-    project = models.ForeignKey("projects.Project", on_delete=models.PROTECT)
+    project = models.ForeignKey('projects.Project', on_delete=models.PROTECT)
     amount = models.DecimalField(max_digits=10, decimal_places=0, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -25,14 +25,14 @@ class Investment(models.Model):
 class SavedStartup(models.Model):
     investor_profile = models.ForeignKey(InvestorProfile, on_delete=models.CASCADE)
     startup_profile = models.ForeignKey(
-        "startups.StartupProfile", on_delete=models.CASCADE
+        'startups.StartupProfile', on_delete=models.CASCADE
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["investor_profile", "startup_profile"],
-                name="unique_saved_startup",
+                fields=['investor_profile', 'startup_profile'],
+                name='unique_saved_startup',
             )
         ]
