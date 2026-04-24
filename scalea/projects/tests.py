@@ -1,8 +1,8 @@
 from django.test import TestCase
-
-from projects.models import Project
 from startups.models import StartupProfile
 from users.models import User
+
+from projects.models import Project
 
 
 class ProjectModelTests(TestCase):
@@ -23,7 +23,7 @@ class ProjectModelTests(TestCase):
             website="https://www.startupcompany.com",
         )
 
-        
+
 
         project = Project.objects.create(
             startup=startup_profile,
@@ -39,4 +39,4 @@ class ProjectModelTests(TestCase):
         self.assertEqual(project.title, "AI Matching Platform")
         self.assertEqual(project.slug, "my-project")
         self.assertEqual(project.raised_amount, 0)
-        self.assertEqual(project.currency, "UAH")       
+        self.assertEqual(project.currency, "UAH")
