@@ -128,7 +128,7 @@ select.inputBase {
   text-decoration: none;
 }
 
-.forgotLink:hover {
+.forgotPasswordLink:hover {
   text-decoration: underline;
 }
 
@@ -223,13 +223,6 @@ select.inputBase {
   align-items: center;
   width: 100%;
   margin-top: -0.5rem;
-}
-
-.forgotLink {
-  font-size: 14px; 
-  font-weight: 700;
-  color: #0F172A;
-  text-decoration: none;
 }
 
 .inputBase::-ms-reveal,
