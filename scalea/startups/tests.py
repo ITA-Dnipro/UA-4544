@@ -79,3 +79,17 @@ class StartupPublicProfileAPITests(TestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 404)
+
+
+class SlugAutoGenerationTests(TestCase):
+    def test_two_profiles_without_slug_do_not_collide(self):
+        """Regression: creating profiles without a slug must not raise IntegrityError."""
+        user1 = _make_user('user1', 'user1@example.com')
+        user2 = _make_user('user2', 'user2@example.com')
+
+        profile1 = _make_startup(user1, company_name='Acme Corp')
+        profile2 = _make_startup(user2, company_name='Acme Corp')
+
+        self.assertIsNotNone(profile1.slug)
+        self.assertIsNotNone(profile2.slug)
+        self.assertNotEqual(profile1.slug, profile2.slug)

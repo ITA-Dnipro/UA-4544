@@ -1,11 +1,12 @@
 from django.conf import settings
 from django.db import models
+from django.utils.text import slugify
 
 
 class StartupProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True, null=True)
     hero_image_url = models.URLField(blank=True)
     logo_url = models.URLField(blank=True)
     short_description = models.CharField(max_length=500, blank=True)
@@ -16,6 +17,13 @@ class StartupProfile(models.Model):
     website = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.slug:
+            base = slugify(self.company_name)[:245]
+            self.slug = f'{base}-{self.pk}'
+            super().save(update_fields=['slug'])
 
     def __str__(self):
         return self.company_name
