@@ -1,5 +1,4 @@
-from django.utils.html import escape
-from investors.models import SavedStartup
+from django.utils.html import linebreaks
 from rest_framework import serializers
 
 from startups.models import StartupProfile
@@ -30,9 +29,9 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_about_html(self, obj):
-        if obj.description:
-            return f'<p>{escape(obj.description)}</p>'
-        return ''
+        if not obj.description:
+            return ''
+        return linebreaks(obj.description, autoescape=True)
 
     def get_contact(self, obj):
         return {
@@ -41,7 +40,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
         }
 
     def get_followers_count(self, obj):
-        return SavedStartup.objects.filter(startup_profile=obj).count()
+        return obj.followers_count
 
     def get_projects_count(self, obj):
-        return obj.project_set.count()
+        return obj.projects_count
