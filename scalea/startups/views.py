@@ -1,3 +1,9 @@
-from django.shortcuts import render
+from rest_framework.generics import RetrieveAPIView
 
-# Create your views here.
+from startups.models import StartupProfile
+from startups.serializers import StartupPublicProfileSerializer
+
+
+class StartupPublicProfileView(RetrieveAPIView):
+    queryset = StartupProfile.objects.all()
+    serializer_class = StartupPublicProfileSerializer
