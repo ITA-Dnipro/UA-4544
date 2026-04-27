@@ -66,19 +66,22 @@ class RegistrationAPITests(TestCase):
             InvestorProfile.objects.filter(user__email='investor@example.com').exists()
         )
 
-    def test_registration_duplicate_email_returns_409(self):
+    def test_registration_duplicate_email_returns_201_and_masks_existence(self):
+        existing_email = 'startup@example.com'
         User.objects.create_user(
-            username='startup@example.com',
-            email='startup@example.com',
+            username=existing_email,
+            email=existing_email,
             password='Password123!',
         )
+        initial_count = User.objects.count()
 
         response = self.client.post(self.url, self.valid_startup_data)
 
-        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            response.data['detail'], 'A user with this email already exists.'
+            response.data['detail'], 'Verification email sent. Please check your inbox.'
         )
+        self.assertEqual(User.objects.count(), initial_count)
 
     def test_registration_weak_password_returns_400(self):
         data = self.valid_startup_data.copy()

@@ -3,17 +3,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from django.db import transaction
 from investors.models import InvestorProfile
-from rest_framework import serializers, status
-from rest_framework.exceptions import APIException
+from rest_framework import serializers
 from startups.models import StartupProfile
 
 User = get_user_model()
-
-
-class DuplicateEmailError(APIException):
-    status_code = status.HTTP_409_CONFLICT
-    default_detail = 'A user with this email already exists.'
-    default_code = 'duplicate_email'
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -29,9 +22,8 @@ class RegisterSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise DuplicateEmailError()
-        return value
+        normalized_email = User.objects.normalize_email(value)
+        return normalized_email.lower()
 
     def validate_password(self, value):
         try:
@@ -45,6 +37,12 @@ class RegisterSerializer(serializers.Serializer):
         role = validated_data.pop('role')
         password = validated_data.pop('password')
         email = validated_data.pop('email')
+
+        user = User.objects.filter(email=email).first()
+
+        if user:
+            self.send_already_registered_email(user)
+            return user
 
         user = User.objects.create_user(
             username=email,
@@ -74,4 +72,7 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
     def send_verification_email(self, user):
+        pass
+
+    def send_already_registered_email(self, user):
         pass

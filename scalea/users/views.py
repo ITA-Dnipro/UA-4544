@@ -19,7 +19,6 @@ class RegisterView(generics.CreateAPIView):
 
         return Response(
             {
-                'id': user.id,
                 'email': user.email,
                 'detail': 'Verification email sent. Please check your inbox.',
             },
