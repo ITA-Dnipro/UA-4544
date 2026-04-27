@@ -1,3 +1,6 @@
+import logging
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -6,15 +9,12 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.conf import settings
-
 
 from users.serializers.auth import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
 )
 from users.tokens import password_reset_token
-import logging
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class PasswordResetRequestView(APIView):
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            reset_url = f"http://{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
 
             html_message = render_to_string(
                 "email/password_reset.html",
@@ -46,7 +46,10 @@ class PasswordResetRequestView(APIView):
                 to=[user.email],
             )
             email_msg.attach_alternative(html_message, "text/html")
-            email_msg.send()
+            try:
+                email_msg.send(fail_silently=False)
+            except Exception:
+                logger.exception("Failed to send password reset email")
 
         return Response(
             {"detail": "If this email exists, you will receive a reset link."},
@@ -69,13 +72,7 @@ class PasswordResetConfirmView(APIView):
         except (ValueError, TypeError):
             user = None
 
-        if not user:
-            return Response(
-                {"detail": "User not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if not password_reset_token.check_token(user, token):
+        if not user or not password_reset_token.check_token(user, token):
             return Response(
                 {"detail": "Invalid or expired token"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -83,7 +80,7 @@ class PasswordResetConfirmView(APIView):
 
         user.set_password(password)
         user.save()
-        logger.warning("Password reset for user: %s", user.email)
+        logger.info("Password reset for user: %s", user.pk)
 
         return Response(
             {"detail": "Password changed successfully"},
