@@ -68,10 +68,10 @@ class Project(models.Model):
             base = (slugify(self.title) or 'project')[: max_len - 6]
             slug = base
             n = 2
-            self.slug = slug
+            self.slug = f'{base}-{n}'
             update_fields = kwargs.get('update_fields')
             if update_fields is not None and 'slug' not in update_fields:
-                kwargs['update_fields'] = list(update_fields).append('slug')
+                kwargs['update_fields'] =  list(update_fields) + ['slug']
             while True:
                 try:
                     with transaction.atomic():
