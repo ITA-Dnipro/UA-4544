@@ -72,7 +72,14 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
     def send_verification_email(self, user):
+        # TODO(i-taras): Implement actual SMTP dispatch & activation token logic [#99]
+        # Users will be LOCKED OUT until this method is implemented
+        # and the activation endpoint is ready.
+        # This is a placeholder to allow the registration schema to merge.
         pass
 
     def send_already_registered_email(self, user):
+        # TODO(i-taras): Implement resend logic for verification emails [#99]
+        # This is a placeholder to allow the registration schema to merge and
+        # NO email is actually dispatched.
         pass
