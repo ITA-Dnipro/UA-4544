@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils.text import slugify
 
 
@@ -64,14 +64,22 @@ class Project(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug and self.title:
-            base = slugify(self.title) or 'project'
+            max_len = self._meta.get_field('slug').max_length
+            base = (slugify(self.title) or 'project')[: max_len - 6]
             slug = base
             n = 2
-            while type(self).objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                slug = f'{base}-{n}'
-                n += 1
             self.slug = slug
-        super().save(*args, **kwargs)
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and 'slug' not in update_fields:
+                kwargs['update_fields'] = list(update_fields).append('slug')
+            while True:
+                try:
+                    with transaction.atomic():
+                        return super().save(*args, **kwargs)
+                except IntegrityError:
+                    self.slug = f'{base}-{n}'
+                    n += 1
+        return super().save(*args, **kwargs)
 
 
 class ProjectAudit(models.Model):
@@ -85,6 +93,7 @@ class ProjectAudit(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        related_name='project_audits',
     )
     timestamp = models.DateTimeField(auto_now_add=True)
     changes = models.JSONField(default=dict)
@@ -96,7 +105,12 @@ class ProjectAudit(models.Model):
         ]
 
     def __str__(self):
-        return f'Audit<{self.project_id} @ {self.timestamp:%Y-%m-%d %H:%M:%S}>'
+        timestamp_str = (
+            self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            if self.timestamp
+            else 'unsaved_timestamp'
+        )
+        return f'Audit<{self.project_id} @ {timestamp_str}>'
 
 
 # TODO (olgagnatenko13): add ProjectAttachment implementation
