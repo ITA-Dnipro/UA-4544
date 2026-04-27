@@ -101,3 +101,6 @@ class ProjectAudit(models.Model):
 
 # TODO (olgagnatenko13): add ProjectAttachment implementation
 # reason: Upload model and logic is missing at the moment
+
+# TODO (olgagnatenko13): add tags as ManyToMany implementation
+# reason: Need to agree with the team, tags exist in multiple models
