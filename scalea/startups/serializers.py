@@ -40,7 +40,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
         }
 
     def get_followers_count(self, obj):
-        return obj.followers_count
+        return getattr(obj, 'followers_count', 0)
 
     def get_projects_count(self, obj):
-        return obj.projects_count
+        return getattr(obj, 'projects_count', 0)

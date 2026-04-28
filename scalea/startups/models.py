@@ -19,11 +19,12 @@ class StartupProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
         if not self.slug:
+            if not self.pk:
+                super().save(*args, **kwargs)
             base = slugify(self.company_name)[:245]
             self.slug = f'{base}-{self.pk}'
-            super().save(update_fields=['slug'])
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.company_name
