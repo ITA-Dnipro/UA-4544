@@ -1,0 +1,222 @@
+.header {
+  width: 100%;
+  background-color: var(--color-bg-white);
+  border-bottom: 1px solid var(--color-border-header);
+}
+
+.headerContainer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 68px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 32px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.logoIcon {
+  display: block;
+  width: 54px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.logoText {
+  display: inline-flex;
+  align-items: center;
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.navLink:hover {
+  opacity: 0.8;
+}
+
+.searchForm {
+  display: flex;
+  align-items: center;
+  width: 300px;
+  height: 40px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--border-radius-base);
+  overflow: hidden;
+  background-color: var(--color-bg-white);
+}
+
+.searchInput {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 14px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--color-text-base);
+  background-color: transparent;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-placeholder);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.searchButton {
+  width: 50px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition: background-color var(--transition-fast);
+}
+
+.searchButton:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.auth {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.loginLink {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.loginLink:hover {
+  opacity: 0.8;
+}
+
+.registerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: var(--border-radius-base);
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+  text-decoration: none;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.registerButton:hover {
+  background-color: var(--color-btn-primary-bg-hover);
+}
+
+.userBlock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profileLink {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.profileLink:hover {
+  opacity: 0.8;
+}
+
+.logoutButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--border-radius-base);
+  background-color: var(--color-btn-secondary-bg);
+  color: var(--color-btn-secondary-text);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.logoutButton:hover {
+  background-color: var(--color-btn-secondary-bg-hover);
+}
