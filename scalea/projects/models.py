@@ -66,12 +66,11 @@ class Project(models.Model):
         if not self.slug and self.title:
             max_len = self._meta.get_field('slug').max_length
             base = (slugify(self.title) or 'project')[: max_len - 6]
-            slug = base
+            self.slug = base
             n = 2
-            self.slug = f'{base}-{n}'
             update_fields = kwargs.get('update_fields')
             if update_fields is not None and 'slug' not in update_fields:
-                kwargs['update_fields'] =  list(update_fields) + ['slug']
+                kwargs['update_fields'] = [*list(update_fields), 'slug']
             while True:
                 try:
                     with transaction.atomic():
