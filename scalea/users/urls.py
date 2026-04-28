@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import RegisterView
 
 from users.views import PasswordResetConfirmView, PasswordResetRequestView
+
+from .views import RegisterView
 
 urlpatterns = [
     path('password-reset/', PasswordResetRequestView.as_view()),

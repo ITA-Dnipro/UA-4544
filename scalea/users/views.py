@@ -6,21 +6,18 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from django.contrib.auth import get_user_model
+from rest_framework.views import APIView
 
-
-from .serializers import RegisterSerializer
 from users.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
 )
 from users.tokens import password_reset_token
+
+from .serializers import RegisterSerializer
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
