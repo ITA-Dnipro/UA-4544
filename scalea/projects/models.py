@@ -74,6 +74,13 @@ class Project(models.Model):
             while True:
                 try:
                     with transaction.atomic():
+                        if (
+                            not type(self)
+                            .objects.filter(slug=self.slug)
+                            .exclude(pk=self.pk)
+                            .exists()
+                        ):
+                            raise
                         return super().save(*args, **kwargs)
                 except IntegrityError:
                     self.slug = f'{base}-{n}'
