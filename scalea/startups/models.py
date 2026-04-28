@@ -24,7 +24,8 @@ class StartupProfile(models.Model):
                 super().save(*args, **kwargs)
             base = slugify(self.company_name)[:245]
             self.slug = f'{base}-{self.pk}'
-        super().save(*args, **kwargs)
+            return super().save(using=kwargs.get('using'), update_fields=['slug'])
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.company_name
