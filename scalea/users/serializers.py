@@ -9,6 +9,23 @@ from startups.models import StartupProfile
 User = get_user_model()
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    uid = serializers.CharField()
+    password = serializers.CharField(min_length=8)
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
