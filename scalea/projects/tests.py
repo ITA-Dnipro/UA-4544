@@ -1,8 +1,10 @@
+from decimal import Decimal
+
 from django.test import TestCase
 from startups.models import StartupProfile
 from users.models import User
 
-from projects.models import Project
+from projects.models import Project, ProjectStatus, ProjectVisibility
 
 
 class ProjectModelTests(TestCase):
@@ -25,15 +27,20 @@ class ProjectModelTests(TestCase):
 
         project = Project.objects.create(
             startup=startup_profile,
-            status=True,
             title='AI Matching Platform',
-            short_description='Platform connecting startups with investors.',
-            description='Detailed project description.',
-            funding_goal=500000,
-            current_funding=100000,
+            slug='my-project',
+            short_description='Fundraising platform',
+            description='Platform connecting startups with investors',
+            target_amount=500000,
         )
 
+        self.assertEqual(Project.objects.count(), 1)
         self.assertEqual(project.startup, startup_profile)
         self.assertEqual(project.title, 'AI Matching Platform')
-        self.assertTrue(project.status)
-        self.assertEqual(project.current_funding, 100000)
+        self.assertEqual(project.slug, 'my-project')
+        self.assertEqual(project.raised_amount, 0)
+        self.assertEqual(project.currency, 'UAH')
+        self.assertEqual(project.slug, 'my-project')
+        self.assertEqual(project.target_amount, Decimal('500000'))
+        self.assertEqual(project.status, ProjectStatus.IDEA)
+        self.assertEqual(project.visibility, ProjectVisibility.PUBLIC)
