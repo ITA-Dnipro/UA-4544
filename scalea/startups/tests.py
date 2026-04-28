@@ -2,7 +2,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from startups.models import StartupProfile
-from users.models import User
 
 
 def _make_user(username, email, **kwargs):
