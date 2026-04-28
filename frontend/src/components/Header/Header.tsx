@@ -46,6 +46,7 @@ const Header = () => {
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               className={styles.searchInput}
+              aria-label="Search startups and investors"
             />
 
             <button

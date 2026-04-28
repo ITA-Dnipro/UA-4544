@@ -33,7 +33,7 @@ body, html {
   --color-btn-secondary-text: #475569;
 
   /* fonts */
-  --font-family-base: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-family-base: 'Inter', -apple-system, 'BlinkMacSystemFont', sans-serif;
   --font-size-base: 16px;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
