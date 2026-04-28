@@ -29,7 +29,7 @@ class ProjectModelTests(TestCase):
             startup=startup_profile,
             title='AI Matching Platform',
             slug='my-project',
-            short_description='Short description',
+            short_description='Fundraising platform',
             description='Platform connecting startups with investors',
             target_amount=500000,
         )

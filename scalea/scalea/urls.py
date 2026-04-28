@@ -18,7 +18,7 @@ Including another URLconf
 from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import path
+from django.urls import include, path
 
 
 def health_check(_request):
@@ -28,5 +28,6 @@ def health_check(_request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health_check),
+    path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
 ]

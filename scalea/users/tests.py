@@ -1,6 +1,12 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
+from investors.models import InvestorProfile
+from rest_framework import status
+from rest_framework.test import APIClient
+from startups.models import StartupProfile
 
-from users.models import User
+User = get_user_model()
 
 
 class UserModelTests(TestCase):
@@ -19,3 +25,82 @@ class UserModelTests(TestCase):
         self.assertTrue(user.is_startup)
         self.assertFalse(user.is_investor)
         self.assertTrue(user.is_verified)
+
+
+class RegistrationAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse('register')
+        self.valid_startup_data = {
+            'email': 'startup@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'startup',
+            'company_name': 'Tech Future',
+            'short_pitch': 'We build AI solutions.',
+        }
+
+    def test_successful_startup_registration(self):
+        response = self.client.post(self.url, self.valid_startup_data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(User.objects.filter(email='startup@example.com').exists())
+        self.assertTrue(
+            StartupProfile.objects.filter(company_name='Tech Future').exists()
+        )
+
+        user = User.objects.get(email='startup@example.com')
+        self.assertFalse(user.is_active)
+
+    def test_successful_investor_registration(self):
+        data = {
+            'email': 'investor@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'investor',
+            'bio': 'Experienced angel investor.',
+            'investment_focus': 'SaaS',
+        }
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            InvestorProfile.objects.filter(user__email='investor@example.com').exists()
+        )
+
+    def test_registration_duplicate_email_returns_201_and_masks_existence(self):
+        existing_email = 'startup@example.com'
+        User.objects.create_user(
+            username=existing_email,
+            email=existing_email,
+            password='Password123!',
+        )
+        initial_count = User.objects.count()
+
+        response = self.client.post(self.url, self.valid_startup_data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data['detail'], 'Verification email sent. Please check your inbox.'
+        )
+        self.assertEqual(User.objects.count(), initial_count)
+
+    def test_registration_weak_password_returns_400(self):
+        data = self.valid_startup_data.copy()
+        data['password'] = '123'
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('password', response.data)
+
+    def test_registration_invalid_email_returns_400(self):
+        data = self.valid_startup_data.copy()
+        data['email'] = 'not-an-email'
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_registration_missing_role_returns_400(self):
+        data = self.valid_startup_data.copy()
+        data.pop('role')
+
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
