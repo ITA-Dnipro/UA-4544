@@ -3,17 +3,17 @@ name = "scalea"
 version = "0.1.0"
 requires-python = "==3.10.*"
 dependencies = [
-  "Django==4.2.30",
+  "Django==5.2.13",
   "djangorestframework==3.17.1",
   "django-cors-headers==4.9.0",
   "python-decouple==3.8",
-  "psycopg2-binary==2.9.11",
+  "psycopg2-binary==2.9.12",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "ruff==0.15.11",
-  "pre-commit==4.5.1",
+  "ruff==0.15.12",
+  "pre-commit==4.6.0",
   "pytest",
   "pytest-cov"
 ]
