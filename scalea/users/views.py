@@ -27,35 +27,37 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
+        email = serializer.validated_data["email"]
 
         user = User.objects.filter(email=email).first()
 
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{uid}/{token}/'
+
+            combined_token = f"{uid}.{token}"
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/{combined_token}/"
 
             html_message = render_to_string(
-                'email/password_reset.html',
+                "email/password_reset.html",
                 {
-                    'reset_url': reset_url,
+                    "reset_url": reset_url,
                 },
             )
             email_msg = EmailMultiAlternatives(
-                subject='Password Reset — Scalea',
-                body=f'Reset your password: {reset_url}',
+                subject="Password Reset — Scalea",
+                body=f"Reset your password: {reset_url}",
                 from_email=settings.EMAIL_HOST_USER,
                 to=[user.email],
             )
-            email_msg.attach_alternative(html_message, 'text/html')
+            email_msg.attach_alternative(html_message, "text/html")
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email')
+                logger.exception("Failed to send password reset email")
 
         return Response(
-            {'detail': 'If this email exists, you will receive a reset link.'},
+            {"detail": "If this email exists, you will receive a reset link."},
             status=status.HTTP_200_OK,
         )
 
@@ -65,11 +67,11 @@ class PasswordResetConfirmView(APIView):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        uid = serializer.validated_data['uid']
-        token = serializer.validated_data['token']
-        password = serializer.validated_data['password']
+        raw_token = serializer.validated_data["token"]
+        password = serializer.validated_data["password"]
 
         try:
+            uid, token = raw_token.split(".", 1)
             decoded_uid = force_str(urlsafe_base64_decode(uid))
             user = User.objects.filter(id=decoded_uid).first()
         except (ValueError, TypeError):
@@ -77,16 +79,16 @@ class PasswordResetConfirmView(APIView):
 
         if not user or not password_reset_token.check_token(user, token):
             return Response(
-                {'detail': 'Invalid or expired token'},
+                {"detail": "Invalid or expired token"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         user.set_password(password)
         user.save()
-        logger.info('Password reset for user: %s', user.pk)
+        logger.info("Password reset for user: %s", user.pk)
 
         return Response(
-            {'detail': 'Password changed successfully'},
+            {"detail": "Password changed successfully"},
             status=status.HTTP_200_OK,
         )
 
@@ -102,8 +104,8 @@ class RegisterView(generics.CreateAPIView):
 
         return Response(
             {
-                'email': user.email,
-                'detail': 'Verification email sent. Please check your inbox.',
+                "email": user.email,
+                "detail": "Verification email sent. Please check your inbox.",
             },
             status=status.HTTP_201_CREATED,
         )
