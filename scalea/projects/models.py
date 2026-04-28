@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Project(models.Model):
-    startup = models.ForeignKey("startups.StartupProfile", on_delete=models.CASCADE)
+    startup = models.ForeignKey('startups.StartupProfile', on_delete=models.CASCADE)
     status = models.BooleanField()
     title = models.CharField(max_length=255)
     short_description = models.CharField(max_length=500, blank=True)
