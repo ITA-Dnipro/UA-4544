@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
+    "types": ["node", "vitest/globals"],
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
@@ -15,4 +16,3 @@
   },
   "include": ["src"]
 }
-
