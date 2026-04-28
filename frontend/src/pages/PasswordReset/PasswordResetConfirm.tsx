@@ -117,7 +117,9 @@ const PasswordResetConfirm: React.FC = () => {
 
         <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
           <div className={styles.inputGroup}>
-            <label className={styles.label}>New Password</label>
+            <label htmlFor="password" className={styles.label}>
+              New Password
+            </label>
             <p className={styles.inputHelpText}>
               Password must be at least 8 characters long and include an
               uppercase letter, a lowercase letter, and a digit.
@@ -125,6 +127,7 @@ const PasswordResetConfirm: React.FC = () => {
 
             <div className={styles.passwordInputWrapper}>
               <input
+                id="password"
                 type={showPassword ? "text" : "password"}
                 {...register("password", {
                   required: "Please enter a password",
@@ -147,7 +150,8 @@ const PasswordResetConfirm: React.FC = () => {
                 type="button"
                 className={styles.eyeButton}
                 onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -161,10 +165,13 @@ const PasswordResetConfirm: React.FC = () => {
           </div>
 
           <div className={styles.inputGroup}>
-            <label className={styles.label}>Confirm New Password</label>
+            <label htmlFor="confirmPassword" className={styles.label}>
+              Confirm New Password
+            </label>
 
             <div className={styles.passwordInputWrapper}>
               <input
+                id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 {...register("confirmPassword", {
                   required: "Please confirm your password",
@@ -182,7 +189,12 @@ const PasswordResetConfirm: React.FC = () => {
                 type="button"
                 className={styles.eyeButton}
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                tabIndex={-1}
+                aria-label={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+                aria-pressed={showConfirmPassword}
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
