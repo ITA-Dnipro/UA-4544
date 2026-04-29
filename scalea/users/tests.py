@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -11,6 +12,8 @@ from rest_framework.test import APIClient, APITestCase
 from startups.models import StartupProfile
 
 from users.tokens import password_reset_token
+from users.models import User
+
 
 User = get_user_model()
 
@@ -178,3 +181,72 @@ class PasswordResetConfirmViewTest(APITestCase):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+
+class TestLoginApi(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.password = 'P@ssw0rd123'
+        self.user = User.objects.create_user(
+            email='user@example.com',
+            username='user@example.com',
+            password=self.password,
+            is_active=True,
+        )
+        self.url = reverse('auth-login')
+
+    def test_valid_credentials_returns_200_with_tokens(self):
+        res = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': self.password},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('access', res.data)
+        self.assertIn('refresh', res.data)
+        self.assertEqual(res.data['user']['email'], 'user@example.com')
+
+    def test_wrong_password_returns_401_generic(self):
+        res = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': 'wrongpass'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(res.data['detail'][0], 'Invalid email or password.')
+
+    def test_lockout_after_5_failed_attempts(self):
+        for _ in range(5):
+            self.client.post(
+                self.url,
+                {'email': 'user@example.com', 'password': 'wrong'},
+                format='json',
+            )
+        res = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': 'wrong'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_successful_login_clears_fail_counter(self):
+        self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': 'wrong'},
+            format='json',
+        )
+        res = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': self.password},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_remember_true_returns_200(self):
+        res = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': self.password, 'remember': True},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
