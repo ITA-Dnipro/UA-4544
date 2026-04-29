@@ -320,6 +320,10 @@ class TestLoginApi(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(res.data['detail'][0], 'Invalid email or password.')
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Invalid email or password.')
 
     def test_missing_role_returns_400(self):
         res = self.client.post(
