@@ -21,7 +21,6 @@ const PasswordResetConfirm: React.FC = () => {
     useState<boolean>(false);
 
   const token = searchParams.get("token");
-  const uid = searchParams.get("uid");
 
   const {
     register,
@@ -45,7 +44,6 @@ const PasswordResetConfirm: React.FC = () => {
         },
         body: JSON.stringify({
           token,
-          uid,
           password: data.password,
         }),
       });
@@ -60,7 +58,7 @@ const PasswordResetConfirm: React.FC = () => {
     }
   };
 
-  if (!token || !uid) {
+  if (!token) {
     return (
       <div className={styles.wrapper}>
         <div className={styles.container}>
