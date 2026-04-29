@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from django.db import transaction
@@ -108,14 +108,13 @@ class LoginSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=['startup', 'investor'], required=True)
 
     def validate(self, attrs):
-        request = self.context.get('request')
         email = attrs['email'].strip().lower()
         password = attrs['password']
         requested_role = attrs['role']
 
-        user = authenticate(request=request, username=email, password=password)
+        user = User.objects.filter(email=email).first()
 
-        if not user or not user.is_active:
+        if not user or not user.check_password(password) or not user.is_active:
             raise serializers.ValidationError(
                 {'detail': 'Invalid email or password.'},
                 code='authorization',
@@ -135,4 +134,5 @@ class LoginSerializer(serializers.Serializer):
 
         attrs['user'] = user
         attrs['email'] = email
+        attrs['role'] = actual_role
         return attrs

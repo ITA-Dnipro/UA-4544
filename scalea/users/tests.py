@@ -183,29 +183,41 @@ class TestLoginApi(APITestCase):
     def setUp(self):
         cache.clear()
         self.password = 'P@ssw0rd123'
+        self.role = 'startup'
         self.user = User.objects.create_user(
             email='user@example.com',
             username='user@example.com',
             password=self.password,
             is_active=True,
+            is_startup=True,
+            is_investor=True,
         )
         self.url = reverse('auth-login')
 
     def test_valid_credentials_returns_200_with_tokens(self):
         res = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': self.password},
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+            },
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn('access', res.data)
         self.assertIn('refresh', res.data)
         self.assertEqual(res.data['user']['email'], 'user@example.com')
+        self.assertEqual(res.data['user']['role'], 'startup')
 
     def test_wrong_password_returns_401_generic(self):
         res = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': 'wrongpass'},
+            {
+                'email': 'user@example.com',
+                'password': 'wrongpass',
+                'role': self.role,
+            },
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -215,17 +227,26 @@ class TestLoginApi(APITestCase):
         for _ in range(5):
             self.client.post(
                 self.url,
-                {'email': 'user@example.com', 'password': 'wrong'},
+                {
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
+                },
                 format='json',
             )
         res = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': 'wrong'},
+            {
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
+            },
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
         self.assertEqual(
-            res.data['detail'], 'Too many failed attempts. Try again later.'
+            res.data['detail'][0],
+            'Too many failed attempts. Try again later.',
         )
 
     def test_successful_login_clears_fail_counter(self):
@@ -233,14 +254,22 @@ class TestLoginApi(APITestCase):
         for _ in range(4):
             self.client.post(
                 self.url,
-                {'email': 'user@example.com', 'password': 'wrong'},
+                {
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
+                },
                 format='json',
             )
 
         # Successful login — should clear the failure counter
         ok = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': self.password},
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+            },
             format='json',
         )
         self.assertEqual(ok.status_code, status.HTTP_200_OK)
@@ -249,7 +278,11 @@ class TestLoginApi(APITestCase):
         # If counter WAS cleared, this is only the 1st failure → 401
         post_login_failure = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': 'wrong'},
+            {
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
+            },
             format='json',
         )
         self.assertEqual(
@@ -261,7 +294,12 @@ class TestLoginApi(APITestCase):
     def test_remember_true_returns_200(self):
         res = self.client.post(
             self.url,
-            {'email': 'user@example.com', 'password': self.password, 'remember': True},
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+                'remember': True,
+            },
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)

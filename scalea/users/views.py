@@ -131,9 +131,9 @@ class LoginView(APIView):
 
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            if email:
-                register_failure(email)
             if 'detail' in serializer.errors:
+                if email:
+                    register_failure(email)
                 return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
