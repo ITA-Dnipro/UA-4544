@@ -125,7 +125,7 @@ class LoginView(APIView):
 
         if email and is_locked(email):
             return Response(
-                {'detail': 'Too many failed attempts. Try again later.'},
+                {'detail': ['Too many failed attempts. Try again later.']},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -148,11 +148,7 @@ class LoginView(APIView):
             refresh.set_exp(lifetime=timedelta(days=30))
             access.set_exp(lifetime=timedelta(hours=12))
 
-        role = None
-        if user.is_startup:
-            role = 'startup'
-        elif user.is_investor:
-            role = 'investor'
+        role = serializer.validated_data['role']
 
         return Response(
             {

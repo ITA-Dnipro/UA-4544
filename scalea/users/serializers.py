@@ -105,15 +105,29 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     remember = serializers.BooleanField(required=False, default=False)
+    role = serializers.ChoiceField(choices=['startup', 'investor'], required=True)
 
     def validate(self, attrs):
         request = self.context.get('request')
         email = attrs['email'].strip().lower()
         password = attrs['password']
+        requested_role = attrs['role']
 
         user = authenticate(request=request, username=email, password=password)
 
         if not user or not user.is_active:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
+
+        actual_role = None
+        if user.is_startup:
+            actual_role = 'startup'
+        elif user.is_investor:
+            actual_role = 'investor'
+
+        if actual_role != requested_role:
             raise serializers.ValidationError(
                 {'detail': 'Invalid email or password.'},
                 code='authorization',
