@@ -48,13 +48,28 @@ const PasswordResetConfirm: React.FC = () => {
         }),
       });
 
+      const payload = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error();
+        const detail =
+          typeof payload?.detail === "string" ? payload.detail : "";
+        const passwordError =
+          Array.isArray(payload?.password) && payload.password.length > 0
+            ? payload.password[0]
+            : null;
+
+        if (/invalid or expired token/i.test(detail)) {
+          setError("This password reset link is invalid or has expired.");
+        } else if (passwordError) {
+          setError(passwordError);
+        } else {
+          setError("Unable to reset password. Please try again.");
+        }
+        return;
       }
 
       setIsSuccess(true);
-    } catch (e) {
-      setError("This password reset link is invalid or has expired.");
+    } catch {
+      setError("Unable to reset password. Please try again.");
     }
   };
 
