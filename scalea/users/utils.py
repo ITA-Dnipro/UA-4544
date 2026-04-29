@@ -103,9 +103,67 @@ class TokenManager:
             return False, None
 
     @staticmethod
+    def consume_token(uid: str, token: str) -> Tuple[bool, Optional[User]]:
+        """
+        Atomically validate and mark a token as consumed (single-use enforcement).
+
+        This operation is atomic to prevent race conditions where concurrent
+        requests both pass validation before either marks the token used.
+
+        Args:
+            uid: The encoded user ID
+            token: The plain token
+
+        Returns:
+            Tuple of (is_valid, user) where user is None if invalid/already-used
+        """
+        from django.db import transaction
+
+        try:
+            user_id = EncodeUidHelper.decode(uid)
+            if user_id is None:
+                return False, None
+
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+            with transaction.atomic():
+                # Use select_for_update to lock the row for this transaction
+                token_record = (
+                    PasswordResetToken.objects.select_for_update()
+                    .select_related("user")
+                    .get(
+                        uid=uid,
+                        token_hash=token_hash,
+                    )
+                )
+
+                # Check if already used
+                if token_record.is_used:
+                    return False, None
+
+                # Check if expired
+                if token_record.is_expired():
+                    return False, None
+
+                # Mark as used atomically within the transaction
+                token_record.mark_used()
+
+                return True, token_record.user
+
+        except (
+            ValueError,
+            PasswordResetToken.DoesNotExist,
+        ):
+            return False, None
+
+
+    @staticmethod
     def mark_token_used(uid: str, token: str) -> bool:
         """
-        Mark a token as used (single-use enforcement).
+        Deprecated: Use consume_token() instead for atomic validation + consumption.
+
+        This method is kept for backward compatibility but should not be used
+        in production code. It does not enforce single-use semantics atomically.
 
         Args:
             uid: The encoded user ID
@@ -241,7 +299,8 @@ class RequestContextHelper:
         """
         Extract client IP address from request.
 
-        Handles X-Forwarded-For header for proxied requests.
+        ⚠️  SECURITY: Only trusts X-Forwarded-For if TRUST_X_FORWARDED_FOR=True
+        in settings. Behind untrusted proxies, this allows IP spoofing.
 
         Args:
             request: Django request object
@@ -249,12 +308,19 @@ class RequestContextHelper:
         Returns:
             Client IP address or None
         """
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
-        else:
-            ip = request.META.get("REMOTE_ADDR")
-        return ip
+        from django.conf import settings
+
+        trust_xff = getattr(settings, "TRUST_X_FORWARDED_FOR", False)
+
+        if trust_xff:
+            # Only use X-Forwarded-For if explicitly trusted (behind known proxy)
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(",")[0].strip()
+                return ip
+
+        # Fall back to direct connection IP (always safe)
+        return request.META.get("REMOTE_ADDR")
 
     @staticmethod
     def get_user_agent(request) -> Optional[str]:

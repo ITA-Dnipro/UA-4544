@@ -167,3 +167,8 @@ REST_FRAMEWORK = {
 # Password reset settings
 PASSWORD_RESET_TIMEOUT = 86400  # 24 hours in seconds
 PASSWORD_RESET_TOKEN_LENGTH = 32
+
+# Audit logging security settings
+# Set to True only if you're behind a trusted proxy (e.g., nginx, AWS ALB)
+# Behind untrusted proxies, this allows IP spoofing in audit logs
+TRUST_X_FORWARDED_FOR = config("TRUST_X_FORWARDED_FOR", default=False, cast=bool)

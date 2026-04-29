@@ -110,33 +110,47 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         """
         Validate that uid and token combination is valid and not expired/used.
 
+        Note: For single-use enforcement, the actual token consumption happens
+        atomically in save() using TokenManager.consume_token() to prevent
+        race conditions.
+
         Raises:
             ValidationError: If token is invalid, expired, or already used
         """
         uid = attrs.get("uid")
         token = attrs.get("token")
 
-        # Validate token and get user
+        # Pre-validate token format without consuming it yet
+        # (actual consumption happens atomically in save())
         is_valid, user = TokenManager.validate_token(uid, token)
 
         if not is_valid or user is None:
             raise serializers.ValidationError({"detail": "Invalid or expired token."})
 
-        # Store user for later use in save()
+        # Store uid and token for atomic consumption in save()
         attrs["_user"] = user
+        attrs["_uid"] = uid
+        attrs["_token"] = token
         return attrs
 
     def save(self):
         """
-        Update user password, revoke sessions, and mark token as used.
+        Atomically consume token, update password, and revoke sessions.
 
         Returns:
             The updated User instance
         """
-        user = self._validated_data.get("_user")
         new_password = self._validated_data.get("password")
-        uid = self._validated_data.get("uid")
-        token = self._validated_data.get("token")
+        uid = self._validated_data.get("_uid")
+        token = self._validated_data.get("_token")
+
+        # Atomically consume the token (prevents race conditions)
+        is_valid, user = TokenManager.consume_token(uid, token)
+
+        if not is_valid or user is None:
+            raise serializers.ValidationError(
+                {"detail": "Invalid or expired token."}
+            )
 
         # Update password
         user.set_password(new_password)
@@ -147,8 +161,5 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         SessionRevoker.revoke_all_sessions(user)
         SessionRevoker.revoke_refresh_tokens(user)
-
-        # Mark token as used
-        TokenManager.mark_token_used(uid, token)
 
         return user

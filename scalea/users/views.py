@@ -53,21 +53,19 @@ class PasswordResetConfirmView(generics.CreateAPIView):
 
         # Check if serializer is valid
         if not serializer.is_valid():
-            # Check if error is due to weak password (422) or invalid token (400)
-            if "password" in serializer.errors:
+            # Distinguish between token validation errors (400) and
+            # other field validation errors (422)
+            if "detail" in serializer.errors:
+                # Token validation failed → 400 Bad Request
                 return Response(
-                    {"password": serializer.errors["password"]},
-                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                )
-            elif "detail" in serializer.errors:
-                return Response(
-                    {"detail": "Invalid or expired token."},
+                    {"detail": serializer.errors["detail"][0]},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             else:
+                # Other validation errors (password, missing fields, etc) → 422
                 return Response(
                     serializer.errors,
-                    status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
 
         # Save and update password
