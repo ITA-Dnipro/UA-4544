@@ -40,10 +40,10 @@ body, html {
   --border-radius-base: 4px;
   --transition-fast: 0.2s ease;
 
-   --color-granite-900: #0f172a; 
+  --color-granite-900: #0f172a; 
   --color-granite-700: #334155; 
   --color-granite-500: #64748b; 
-  --color-granite-400: `#94a3b8`;
+  --color-granite-400: #94a3b8;
   --color-granite-200: #e2e8f0; 
   
   --color-bg-page: #f8f5ee;
