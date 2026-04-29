@@ -67,12 +67,15 @@
     "pk": 1,
     "fields": {
       "startup": 1,
-      "status": true,
       "title": "AI Matching Platform",
+      "slug": "ai-matching-platform",
       "short_description": "Platform connecting startups with investors.",
       "description": "A platform that helps startups find relevant investors using AI-based matching.",
-      "funding_goal": "500000",
-      "current_funding": "100000",
+      "status": "fundraising",
+      "target_amount": "500000.00",
+      "raised_amount": "100000.00",
+      "currency": "UAH",
+      "visibility": "public",
       "created_at": "2026-04-21T10:00:00Z",
       "updated_at": "2026-04-21T10:00:00Z"
     }
