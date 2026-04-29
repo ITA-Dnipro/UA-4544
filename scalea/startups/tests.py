@@ -1,8 +1,11 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from projects.models import Project
 from startups.models import StartupProfile
+
+User = get_user_model()
 
 
 def _make_user(username, email, **kwargs):
@@ -224,4 +227,13 @@ class StartupProjectListAPITests(TestCase):
         response = self.client.get(self._url(99999))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_invalid_status_param_is_ignored(self):
+        """An unrecognised ?status value must not filter the queryset."""
+        _make_project(self.startup, title='Active One', status=True)
+        _make_project(self.startup, title='Inactive One', status=False)
+        response = self.client.get(self.url + '?status=abc')
+        data = response.json()
+
+        self.assertEqual(data['count'], 2)
 

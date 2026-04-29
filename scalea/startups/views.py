@@ -32,8 +32,9 @@ class StartupProjectListView(ListAPIView):
         startup = get_object_or_404(StartupProfile, pk=startup_id)
         qs = Project.objects.filter(startup=startup)
 
-        status_param = self.request.query_params.get('status')
-        if status_param is not None:
-            qs = qs.filter(status=(status_param.lower() == 'active'))
+        VALID_STATUSES = {'active': True, 'inactive': False}
+        status_param = self.request.query_params.get('status', '').lower()
+        if status_param in VALID_STATUSES:
+            qs = qs.filter(status=VALID_STATUSES[status_param])
 
         return qs.order_by('-created_at')

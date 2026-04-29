@@ -21,7 +21,7 @@ class StartupProfile(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             if not self.pk:
-                super().save(*args, **kwargs)
+                super().save(*args, **{k: v for k, v in kwargs.items() if k != 'update_fields'})
             base = slugify(self.company_name)[:245]
             self.slug = f'{base}-{self.pk}'
             return super().save(using=kwargs.get('using'), update_fields=['slug'])
