@@ -143,8 +143,10 @@ class LoginView(APIView):
         clear_failures(email)
 
         refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
         if remember:
             refresh.set_exp(lifetime=timedelta(days=30))
+            access.set_exp(lifetime=timedelta(hours=12))
 
         role = None
         if user.is_startup:
