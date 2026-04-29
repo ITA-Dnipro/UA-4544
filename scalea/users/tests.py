@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -11,11 +10,8 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from startups.models import StartupProfile
 
-from users.tokens import password_reset_token
 from users.models import User
-
-
-User = get_user_model()
+from users.tokens import password_reset_token
 
 
 class UserModelTests(TestCase):
@@ -183,7 +179,6 @@ class PasswordResetConfirmViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
-
 class TestLoginApi(APITestCase):
     def setUp(self):
         cache.clear()
@@ -229,19 +224,39 @@ class TestLoginApi(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(
+            res.data['detail'], 'Too many failed attempts. Try again later.'
+        )
 
     def test_successful_login_clears_fail_counter(self):
-        self.client.post(
-            self.url,
-            {'email': 'user@example.com', 'password': 'wrong'},
-            format='json',
-        )
-        res = self.client.post(
+        # Accumulate 4 failures (one below the lockout threshold of 5)
+        for _ in range(4):
+            self.client.post(
+                self.url,
+                {'email': 'user@example.com', 'password': 'wrong'},
+                format='json',
+            )
+
+        # Successful login — should clear the failure counter
+        ok = self.client.post(
             self.url,
             {'email': 'user@example.com', 'password': self.password},
             format='json',
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+
+        # If counter was NOT cleared, this 5th failure would trigger lockout (429)
+        # If counter WAS cleared, this is only the 1st failure → 401
+        post_login_failure = self.client.post(
+            self.url,
+            {'email': 'user@example.com', 'password': 'wrong'},
+            format='json',
+        )
+        self.assertEqual(
+            post_login_failure.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+            'Counter was not cleared after login — lockout triggered prematurely',
+        )
 
     def test_remember_true_returns_200(self):
         res = self.client.post(

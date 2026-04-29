@@ -1,6 +1,7 @@
-from datetime import timedelta
 import logging
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -9,20 +10,18 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.throttling import ScopedRateThrottle
 
 from .security import clear_failures, is_locked, register_failure
-from .tokens import password_reset_token
 from .serializers import (
     LoginSerializer,
-    RegisterSerializer,
     PasswordResetConfirmSerializer,
-    PasswordResetRequestSerializer
+    PasswordResetRequestSerializer,
+    RegisterSerializer,
 )
-
-
+from .tokens import password_reset_token
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
