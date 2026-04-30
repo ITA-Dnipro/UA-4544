@@ -32,13 +32,13 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.ChoiceField(choices=['startup', 'investor'])
-    company_name = serializers.CharField(required=False, allow_blank=True, default='')
-    short_pitch = serializers.CharField(required=False, allow_blank=True, default='')
-    website = serializers.URLField(required=False, allow_blank=True, default='')
-    bio = serializers.CharField(required=False, allow_blank=True, default='')
+    role = serializers.ChoiceField(choices=["startup", "investor"])
+    company_name = serializers.CharField(required=False, allow_blank=True, default="")
+    short_pitch = serializers.CharField(required=False, allow_blank=True, default="")
+    website = serializers.URLField(required=False, allow_blank=True, default="")
+    bio = serializers.CharField(required=False, allow_blank=True, default="")
     investment_focus = serializers.CharField(
-        required=False, allow_blank=True, default=''
+        required=False, allow_blank=True, default=""
     )
 
     def validate_email(self, value):
@@ -54,9 +54,9 @@ class RegisterSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        role = validated_data.pop('role')
-        password = validated_data.pop('password')
-        email = validated_data.pop('email')
+        role = validated_data.pop("role")
+        password = validated_data.pop("password")
+        email = validated_data.pop("email")
 
         user = User.objects.filter(email=email).first()
 
@@ -69,23 +69,23 @@ class RegisterSerializer(serializers.Serializer):
             email=email,
             password=password,
             is_active=False,
-            is_startup=(role == 'startup'),
-            is_investor=(role == 'investor'),
+            is_startup=(role == "startup"),
+            is_investor=(role == "investor"),
         )
 
-        if role == 'startup':
+        if role == "startup":
             StartupProfile.objects.create(
                 user=user,
-                company_name=validated_data.get('company_name', ''),
-                description=validated_data.get('short_pitch', ''),
-                website=validated_data.get('website', ''),
+                company_name=validated_data.get("company_name", ""),
+                description=validated_data.get("short_pitch", ""),
+                website=validated_data.get("website", ""),
             )
         else:
             InvestorProfile.objects.create(
                 user=user,
-                company_name=validated_data.get('company_name', ''),
-                bio=validated_data.get('bio', ''),
-                investment_focus=validated_data.get('investment_focus', ''),
+                company_name=validated_data.get("company_name", ""),
+                bio=validated_data.get("bio", ""),
+                investment_focus=validated_data.get("investment_focus", ""),
             )
 
         self.send_verification_email(user)

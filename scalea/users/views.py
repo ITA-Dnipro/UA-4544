@@ -28,7 +28,7 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
+        email = serializer.validated_data["email"]
 
         user = User.objects.filter(email=email).first()
 
@@ -43,22 +43,22 @@ class PasswordResetRequestView(APIView):
                 token_hash=token_hash,
             )
 
-            combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
+            combined_token = f"{uid}.{token}"
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/{combined_token}/"
 
             html_message = render_to_string(
-                'email/password_reset.html',
+                "email/password_reset.html",
                 {
-                    'reset_url': reset_url,
+                    "reset_url": reset_url,
                 },
             )
             email_msg = EmailMultiAlternatives(
-                subject='Password Reset — Scalea',
-                body=f'Reset your password: {reset_url}',
+                subject="Password Reset — Scalea",
+                body=f"Reset your password: {reset_url}",
                 from_email=settings.EMAIL_HOST_USER,
                 to=[user.email],
             )
-            email_msg.attach_alternative(html_message, 'text/html')
+            email_msg.attach_alternative(html_message, "text/html")
             try:
                 email_msg.send(fail_silently=False)
                 # Log successful password reset request
@@ -66,31 +66,31 @@ class PasswordResetRequestView(APIView):
                 user_agent = self._get_user_agent(request)
                 PasswordResetAuditLog.objects.create(
                     user=user,
-                    action='request',
+                    action="request",
                     ip_address=client_ip,
                     user_agent=user_agent,
-                    details={'success': True},
+                    details={"success": True},
                 )
             except Exception:
-                logger.exception('Failed to send password reset email')
+                logger.exception("Failed to send password reset email")
 
         return Response(
-            {'detail': 'If this email exists, you will receive a reset link.'},
+            {"detail": "If this email exists, you will receive a reset link."},
             status=status.HTTP_200_OK,
         )
 
     def _get_client_ip(self, request):
         """Extract client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
+            ip = x_forwarded_for.split(",")[0]
         else:
-            ip = request.META.get('REMOTE_ADDR')
+            ip = request.META.get("REMOTE_ADDR")
         return ip
 
     def _get_user_agent(self, request):
         """Extract user agent from request."""
-        return request.META.get('HTTP_USER_AGENT', '')
+        return request.META.get("HTTP_USER_AGENT", "")
 
 
 class PasswordResetConfirmView(APIView):
@@ -98,22 +98,22 @@ class PasswordResetConfirmView(APIView):
 
     def get_client_ip(self, request):
         """Extract client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
+            ip = x_forwarded_for.split(",")[0]
         else:
-            ip = request.META.get('REMOTE_ADDR')
+            ip = request.META.get("REMOTE_ADDR")
         return ip
 
     def get_user_agent(self, request):
         """Extract user agent from request."""
-        return request.META.get('HTTP_USER_AGENT', '')
+        return request.META.get("HTTP_USER_AGENT", "")
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         if not serializer.is_valid():
             # Return 422 for password validation errors, 400 for other errors
-            if 'password' in serializer.errors:
+            if "password" in serializer.errors:
                 return Response(
                     serializer.errors,
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -123,24 +123,24 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        raw_token = serializer.validated_data['token']
-        password = serializer.validated_data['password']
-        uid = serializer.validated_data.get('uid', '')
+        raw_token = serializer.validated_data["token"]
+        password = serializer.validated_data["password"]
+        uid = serializer.validated_data.get("uid", "")
 
         client_ip = self.get_client_ip(request)
         user_agent = self.get_user_agent(request)
 
         # Parse token: either combined format or separate uid/token
         try:
-            if '.' in raw_token:
+            if "." in raw_token:
                 # Combined format: uid.token
-                uid, token = raw_token.split('.', 1)
+                uid, token = raw_token.split(".", 1)
             else:
                 # Separate uid and token
                 token = raw_token
                 if not uid:
                     return Response(
-                        {'detail': 'Invalid or expired token.'},
+                        {"detail": "Invalid or expired token."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
@@ -155,13 +155,13 @@ class PasswordResetConfirmView(APIView):
             if user:
                 PasswordResetAuditLog.objects.create(
                     user=user,
-                    action='failed',
+                    action="failed",
                     ip_address=client_ip,
                     user_agent=user_agent,
-                    details={'reason': 'invalid_or_expired_token'},
+                    details={"reason": "invalid_or_expired_token"},
                 )
             return Response(
-                {'detail': 'Invalid or expired token.'},
+                {"detail": "Invalid or expired token."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -175,13 +175,13 @@ class PasswordResetConfirmView(APIView):
         if reset_token_record and reset_token_record.is_used:
             PasswordResetAuditLog.objects.create(
                 user=user,
-                action='failed',
+                action="failed",
                 ip_address=client_ip,
                 user_agent=user_agent,
-                details={'reason': 'token_already_used'},
+                details={"reason": "token_already_used"},
             )
             return Response(
-                {'detail': 'Invalid or expired token.'},
+                {"detail": "Invalid or expired token."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -202,21 +202,23 @@ class PasswordResetConfirmView(APIView):
             pass
         except Exception:
             # Token revocation is optional; log but don't fail
-            logger.warning('Failed to revoke tokens for user: %s', user.pk)
+            logger.warning("Failed to revoke tokens for user: %s", user.pk)
 
         # Log successful password reset
         PasswordResetAuditLog.objects.create(
             user=user,
-            action='confirm',
+            action="confirm",
             ip_address=client_ip,
             user_agent=user_agent,
-            details={'success': True},
+            details={"success": True},
         )
 
-        logger.info('Password reset confirmed for user: %s from IP: %s', user.pk, client_ip)
+        logger.info(
+            "Password reset confirmed for user: %s from IP: %s", user.pk, client_ip
+        )
 
         return Response(
-            {'detail': 'Password changed successfully.'},
+            {"detail": "Password changed successfully."},
             status=status.HTTP_200_OK,
         )
 
@@ -232,8 +234,8 @@ class RegisterView(generics.CreateAPIView):
 
         return Response(
             {
-                'email': user.email,
-                'detail': 'Verification email sent. Please check your inbox.',
+                "email": user.email,
+                "detail": "Verification email sent. Please check your inbox.",
             },
             status=status.HTTP_201_CREATED,
         )
