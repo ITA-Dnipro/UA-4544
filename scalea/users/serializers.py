@@ -1,12 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from rest_framework import serializers
 from django.core import exceptions
 from django.db import transaction
 from investors.models import InvestorProfile
+from rest_framework import serializers
 from startups.models import StartupProfile
-
-from .utils import TokenManager
 
 User = get_user_model()
 
@@ -19,7 +17,6 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    uid = serializers.CharField(required=False, allow_blank=True, default="")
     token = serializers.CharField()
     password = serializers.CharField(min_length=8)
 
@@ -31,13 +28,13 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.ChoiceField(choices=["startup", "investor"])
-    company_name = serializers.CharField(required=False, allow_blank=True, default="")
-    short_pitch = serializers.CharField(required=False, allow_blank=True, default="")
-    website = serializers.URLField(required=False, allow_blank=True, default="")
-    bio = serializers.CharField(required=False, allow_blank=True, default="")
+    role = serializers.ChoiceField(choices=['startup', 'investor'])
+    company_name = serializers.CharField(required=False, allow_blank=True, default='')
+    short_pitch = serializers.CharField(required=False, allow_blank=True, default='')
+    website = serializers.URLField(required=False, allow_blank=True, default='')
+    bio = serializers.CharField(required=False, allow_blank=True, default='')
     investment_focus = serializers.CharField(
-        required=False, allow_blank=True, default=""
+        required=False, allow_blank=True, default=''
     )
 
     def validate_email(self, value):
@@ -53,9 +50,9 @@ class RegisterSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        role = validated_data.pop("role")
-        password = validated_data.pop("password")
-        email = validated_data.pop("email")
+        role = validated_data.pop('role')
+        password = validated_data.pop('password')
+        email = validated_data.pop('email')
 
         user = User.objects.filter(email=email).first()
 
@@ -68,23 +65,23 @@ class RegisterSerializer(serializers.Serializer):
             email=email,
             password=password,
             is_active=False,
-            is_startup=(role == "startup"),
-            is_investor=(role == "investor"),
+            is_startup=(role == 'startup'),
+            is_investor=(role == 'investor'),
         )
 
-        if role == "startup":
+        if role == 'startup':
             StartupProfile.objects.create(
                 user=user,
-                company_name=validated_data.get("company_name", ""),
-                description=validated_data.get("short_pitch", ""),
-                website=validated_data.get("website", ""),
+                company_name=validated_data.get('company_name', ''),
+                description=validated_data.get('short_pitch', ''),
+                website=validated_data.get('website', ''),
             )
         else:
             InvestorProfile.objects.create(
                 user=user,
-                company_name=validated_data.get("company_name", ""),
-                bio=validated_data.get("bio", ""),
-                investment_focus=validated_data.get("investment_focus", ""),
+                company_name=validated_data.get('company_name', ''),
+                bio=validated_data.get('bio', ''),
+                investment_focus=validated_data.get('investment_focus', ''),
             )
 
         self.send_verification_email(user)
@@ -102,25 +99,3 @@ class RegisterSerializer(serializers.Serializer):
         # This is a placeholder to allow the registration schema to merge and
         # NO email is actually dispatched.
         pass
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    """
-    Serializer for confirming password reset with token and new password.
-
-    Supports both formats:
-    - Combined: {"token": "uid.token", "password": "..."}
-    - Separate: {"uid": "uid", "token": "token", "password": "..."}
-    """
-
-    uid = serializers.CharField(required=False, allow_blank=True, default="")
-    token = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=8)
-
-    def validate_password(self, value):
-        """Validate password meets complexity requirements."""
-        try:
-            validate_password(value)
-        except exceptions.ValidationError as e:
-            raise serializers.ValidationError(list(e.messages)) from e
-        return value

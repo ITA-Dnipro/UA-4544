@@ -3,11 +3,14 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from startups.models import StartupProfile
-from users.utils import TokenManager
+
+from users.tokens import password_reset_token
 
 User = get_user_model()
 
@@ -138,7 +141,8 @@ class PasswordResetConfirmViewTest(APITestCase):
             email="test@gmail.com",
             password="OldP@ssword1",
         )
-        self.uid, self.token = TokenManager.generate_token(self.user)
+        self.uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        self.token = password_reset_token.make_token(self.user)
         self.combined_token = f"{self.uid}.{self.token}"
         self.url = "/api/auth/password-reset/confirm/"
 
