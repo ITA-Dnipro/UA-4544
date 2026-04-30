@@ -221,7 +221,10 @@ class TestLoginApi(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(res.data['detail'][0], 'Invalid email or password.')
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Invalid email or password.')
 
     def test_lockout_after_5_failed_attempts(self):
         for _ in range(5):
@@ -244,10 +247,10 @@ class TestLoginApi(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
-        self.assertEqual(
-            res.data['detail'][0],
-            'Too many failed attempts. Try again later.',
-        )
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Too many failed attempts. Try again later.')
 
     def test_successful_login_clears_fail_counter(self):
         # Accumulate 4 failures (one below the lockout threshold of 5)
@@ -319,7 +322,6 @@ class TestLoginApi(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(res.data['detail'][0], 'Invalid email or password.')
         detail = res.data.get('detail')
         if isinstance(detail, list):
             detail = detail[0]

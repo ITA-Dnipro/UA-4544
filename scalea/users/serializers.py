@@ -120,13 +120,13 @@ class LoginSerializer(serializers.Serializer):
                 code='authorization',
             )
 
-        actual_role = None
-        if user.is_startup:
-            actual_role = 'startup'
-        elif user.is_investor:
-            actual_role = 'investor'
+        if requested_role == 'startup' and not user.is_startup:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
 
-        if actual_role != requested_role:
+        if requested_role == 'investor' and not user.is_investor:
             raise serializers.ValidationError(
                 {'detail': 'Invalid email or password.'},
                 code='authorization',
@@ -134,5 +134,5 @@ class LoginSerializer(serializers.Serializer):
 
         attrs['user'] = user
         attrs['email'] = email
-        attrs['role'] = actual_role
+        attrs['role'] = requested_role
         return attrs
