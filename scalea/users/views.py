@@ -121,7 +121,8 @@ class LoginView(APIView):
     throttle_scope = 'login'
 
     def post(self, request):
-        email = (request.data.get('email') or '').strip().lower()
+        raw_email = request.data.get('email')
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else ''
 
         if email and is_locked(email):
             return Response(
