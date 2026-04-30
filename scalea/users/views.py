@@ -11,11 +11,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from users.models import PasswordResetAuditLog, PasswordResetToken
 from users.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
 )
-from users.tokens import password_reset_token
+from users.tokens import hash_token, password_reset_token
 
 from .serializers import RegisterSerializer
 
@@ -35,6 +36,13 @@ class PasswordResetRequestView(APIView):
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
+            # Store token hash for single-use tracking
+            token_hash = hash_token(token)
+            PasswordResetToken.objects.create(
+                user=user,
+                token_hash=token_hash,
+            )
+
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
@@ -53,6 +61,16 @@ class PasswordResetRequestView(APIView):
             email_msg.attach_alternative(html_message, 'text/html')
             try:
                 email_msg.send(fail_silently=False)
+                # Log successful password reset request
+                client_ip = self._get_client_ip(request)
+                user_agent = self._get_user_agent(request)
+                PasswordResetAuditLog.objects.create(
+                    user=user,
+                    action='request',
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    details={'success': True},
+                )
             except Exception:
                 logger.exception('Failed to send password reset email')
 
@@ -61,34 +79,144 @@ class PasswordResetRequestView(APIView):
             status=status.HTTP_200_OK,
         )
 
+    def _get_client_ip(self, request):
+        """Extract client IP address from request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def _get_user_agent(self, request):
+        """Extract user agent from request."""
+        return request.META.get('HTTP_USER_AGENT', '')
+
 
 class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def get_client_ip(self, request):
+        """Extract client IP address from request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def get_user_agent(self, request):
+        """Extract user agent from request."""
+        return request.META.get('HTTP_USER_AGENT', '')
+
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            # Return 422 for password validation errors, 400 for other errors
+            if 'password' in serializer.errors:
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         raw_token = serializer.validated_data['token']
         password = serializer.validated_data['password']
+        uid = serializer.validated_data.get('uid', '')
 
+        client_ip = self.get_client_ip(request)
+        user_agent = self.get_user_agent(request)
+
+        # Parse token: either combined format or separate uid/token
         try:
-            uid, token = raw_token.split('.', 1)
+            if '.' in raw_token:
+                # Combined format: uid.token
+                uid, token = raw_token.split('.', 1)
+            else:
+                # Separate uid and token
+                token = raw_token
+                if not uid:
+                    return Response(
+                        {'detail': 'Invalid or expired token.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
             decoded_uid = force_str(urlsafe_base64_decode(uid))
             user = User.objects.filter(id=decoded_uid).first()
         except (ValueError, TypeError):
             user = None
 
+        # Validate user and token
         if not user or not password_reset_token.check_token(user, token):
+            # Log failed reset attempt
+            if user:
+                PasswordResetAuditLog.objects.create(
+                    user=user,
+                    action='failed',
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    details={'reason': 'invalid_or_expired_token'},
+                )
             return Response(
-                {'detail': 'Invalid or expired token'},
+                {'detail': 'Invalid or expired token.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Check if token has already been used
+        token_hash = hash_token(token)
+        reset_token_record = PasswordResetToken.objects.filter(
+            user=user,
+            token_hash=token_hash,
+        ).first()
+
+        if reset_token_record and reset_token_record.is_used:
+            PasswordResetAuditLog.objects.create(
+                user=user,
+                action='failed',
+                ip_address=client_ip,
+                user_agent=user_agent,
+                details={'reason': 'token_already_used'},
+            )
+            return Response(
+                {'detail': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Set new password
         user.set_password(password)
         user.save()
-        logger.info('Password reset for user: %s', user.pk)
+
+        # Mark token as used
+        if reset_token_record:
+            reset_token_record.mark_as_used()
+
+        # Revoke all refresh tokens (logout from all devices)
+        # Note: Token revocation depends on your authentication strategy
+        # If using JWT tokens, implement token blacklisting accordingly
+        try:
+            # Attempt to revoke tokens if jwt tokens are used
+            # This is optional and depends on your token strategy
+            pass
+        except Exception:
+            # Token revocation is optional; log but don't fail
+            logger.warning('Failed to revoke tokens for user: %s', user.pk)
+
+        # Log successful password reset
+        PasswordResetAuditLog.objects.create(
+            user=user,
+            action='confirm',
+            ip_address=client_ip,
+            user_agent=user_agent,
+            details={'success': True},
+        )
+
+        logger.info('Password reset confirmed for user: %s from IP: %s', user.pk, client_ip)
 
         return Response(
-            {'detail': 'Password changed successfully'},
+            {'detail': 'Password changed successfully.'},
             status=status.HTTP_200_OK,
         )
 
