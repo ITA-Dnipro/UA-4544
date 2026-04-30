@@ -11,6 +11,23 @@ from .utils import TokenManager
 User = get_user_model()
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField(required=False, allow_blank=True, default="")
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8)
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -91,12 +108,14 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     """
     Serializer for confirming password reset with token and new password.
 
-    Validates token, uid, and password complexity.
+    Supports both formats:
+    - Combined: {"token": "uid.token", "password": "..."}
+    - Separate: {"uid": "uid", "token": "token", "password": "..."}
     """
 
-    uid = serializers.CharField(required=True, write_only=True)
-    token = serializers.CharField(required=True, write_only=True)
-    password = serializers.CharField(write_only=True, min_length=8, required=True)
+    uid = serializers.CharField(required=False, allow_blank=True, default="")
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
 
     def validate_password(self, value):
         """Validate password meets complexity requirements."""
@@ -105,61 +124,3 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         except exceptions.ValidationError as e:
             raise serializers.ValidationError(list(e.messages)) from e
         return value
-
-    def validate(self, attrs):
-        """
-        Validate that uid and token combination is valid and not expired/used.
-
-        Note: For single-use enforcement, the actual token consumption happens
-        atomically in save() using TokenManager.consume_token() to prevent
-        race conditions.
-
-        Raises:
-            ValidationError: If token is invalid, expired, or already used
-        """
-        uid = attrs.get("uid")
-        token = attrs.get("token")
-
-        # Pre-validate token format without consuming it yet
-        # (actual consumption happens atomically in save())
-        is_valid, user = TokenManager.validate_token(uid, token)
-
-        if not is_valid or user is None:
-            raise serializers.ValidationError({"detail": "Invalid or expired token."})
-
-        # Store uid and token for atomic consumption in save()
-        attrs["_user"] = user
-        attrs["_uid"] = uid
-        attrs["_token"] = token
-        return attrs
-
-    def save(self):
-        """
-        Atomically consume token, update password, and revoke sessions.
-
-        Returns:
-            The updated User instance
-        """
-        new_password = self._validated_data.get("password")
-        uid = self._validated_data.get("_uid")
-        token = self._validated_data.get("_token")
-
-        # Atomically consume the token (prevents race conditions)
-        is_valid, user = TokenManager.consume_token(uid, token)
-
-        if not is_valid or user is None:
-            raise serializers.ValidationError(
-                {"detail": "Invalid or expired token."}
-            )
-
-        # Update password
-        user.set_password(new_password)
-        user.save(update_fields=["password"])
-
-        # Revoke sessions and tokens
-        from .utils import SessionRevoker
-
-        SessionRevoker.revoke_all_sessions(user)
-        SessionRevoker.revoke_refresh_tokens(user)
-
-        return user
