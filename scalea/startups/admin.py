@@ -1,2 +1,4 @@
 
-# Register your models here.
+from .models import StartupProfile
+
+admin.site.register(StartupProfile)
