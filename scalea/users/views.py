@@ -20,6 +20,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from .models import PasswordResetAudit
 from .security import clear_failures, is_locked, register_failure
 from .serializers import (
     LoginSerializer,
@@ -46,30 +47,37 @@ class PasswordResetRequestView(APIView):
 
         user = User.objects.filter(email=email).first()
 
+        # Audit the attempt regardless of user existence to prevent enumeration
+        PasswordResetAudit.objects.create(
+            user=user,
+            email=email,
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-
+            
+            # Using the combined token format for cleaner URLs
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
             html_message = render_to_string(
                 'email/password_reset.html',
-                {
-                    'reset_url': reset_url,
-                },
+                {'reset_url': reset_url},
             )
             email_msg = EmailMultiAlternatives(
                 subject='Password Reset — Scalea',
                 body=f'Reset your password: {reset_url}',
-                from_email=settings.EMAIL_HOST_USER,
+                from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
             )
             email_msg.attach_alternative(html_message, 'text/html')
+            
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email')
+                logger.exception('Failed to send password reset email to %s', email)
 
         return Response(
             {'detail': 'If this email exists, you will receive a reset link.'},
@@ -90,6 +98,7 @@ class PasswordResetConfirmView(APIView):
         password = serializer.validated_data['password']
 
         try:
+            # Supports the 'uid.token' format
             uid, token = raw_token.split('.', 1)
             decoded_uid = force_str(urlsafe_base64_decode(uid))
             user = User.objects.filter(id=decoded_uid).first()
@@ -106,10 +115,11 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
+            # Security: Invalidate all existing sessions/tokens after password change
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
-        logger.info('Password reset for user: %s', user.pk)
+        logger.info('Password reset successful for user: %s', user.pk)
 
         return Response(
             {'detail': 'Password changed successfully'},
@@ -121,7 +131,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *_args, **_kwargs):
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -152,11 +162,9 @@ class LoginView(APIView):
 
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            if 'detail' in serializer.errors:
-                if email:
-                    register_failure(email)
-                return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if email:
+                register_failure(email)
+            return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
         user = serializer.validated_data['user']
         remember = serializer.validated_data['remember']
@@ -165,11 +173,10 @@ class LoginView(APIView):
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
+        
         if remember:
             refresh.set_exp(lifetime=timedelta(days=30))
             access.set_exp(lifetime=timedelta(hours=12))
-
-        role = serializer.validated_data['role']
 
         return Response(
             {
@@ -178,7 +185,7 @@ class LoginView(APIView):
                 'user': {
                     'id': user.id,
                     'email': user.email,
-                    'role': role,
+                    'role': serializer.validated_data.get('role'),
                 },
             },
             status=status.HTTP_200_OK,
@@ -200,5 +207,4 @@ class LogoutView(APIView):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-
         return Response(status=status.HTTP_204_NO_CONTENT)
