@@ -236,4 +236,3 @@ class StartupProjectListAPITests(TestCase):
         data = response.json()
 
         self.assertEqual(data['count'], 2)
-

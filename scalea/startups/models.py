@@ -21,14 +21,18 @@ class StartupProfile(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             if not self.pk:
-                super().save(*args, **{k: v for k, v in kwargs.items() if k != 'update_fields'})
+                super().save(
+                    *args, **{k: v for k, v in kwargs.items() if k != 'update_fields'}
+                )
             base = slugify(self.company_name)[:245]
             self.slug = f'{base}-{self.pk}'
             update_fields = kwargs.get('update_fields')
             if update_fields is not None:
                 merged_fields = set(update_fields)
                 merged_fields.add('slug')
-                return super().save(using=kwargs.get('using'), update_fields=list(merged_fields))
+                return super().save(
+                    using=kwargs.get('using'), update_fields=list(merged_fields)
+                )
             return super().save(using=kwargs.get('using'), update_fields=['slug'])
         return super().save(*args, **kwargs)
 
