@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-
 from projects.models import Project
+
 from startups.models import StartupProfile
 
 User = get_user_model()
@@ -33,10 +33,10 @@ def _make_startup(user, **kwargs):
 def _make_project(startup, **kwargs):
     defaults = {
         'title': 'Test Project',
-        'status': True,
+        'status': 'idea',
         'short_description': 'A short desc.',
         'description': 'Full description.',
-        'funding_goal': 100000,
+        'target_amount': 100000,
     }
     defaults.update(kwargs)
     return Project.objects.create(startup=startup, **defaults)
@@ -134,7 +134,7 @@ class StartupProjectListAPITests(TestCase):
         _make_project(
             self.startup,
             title='Handmade Chairs',
-            status=True,
+            status='idea',
             short_description='Fine woodwork.',
         )
         response = self.client.get(self.url)
@@ -142,16 +142,16 @@ class StartupProjectListAPITests(TestCase):
 
         self.assertIn('id', card)
         self.assertEqual(card['title'], 'Handmade Chairs')
-        self.assertEqual(card['status'], 'active')
+        self.assertEqual(card['status'], 'idea')
         self.assertIn('thumbnail', card)
         self.assertEqual(card['short_description'], 'Fine woodwork.')
 
-    def test_inactive_project_status_string(self):
-        _make_project(self.startup, title='Dormant', status=False)
+    def test_closed_project_status_string(self):
+        _make_project(self.startup, title='Dormant', status='closed')
         response = self.client.get(self.url)
         card = response.json()['results'][0]
 
-        self.assertEqual(card['status'], 'inactive')
+        self.assertEqual(card['status'], 'closed')
 
     def test_count_reflects_total_projects(self):
         for i in range(4):
@@ -185,19 +185,19 @@ class StartupProjectListAPITests(TestCase):
 
         self.assertEqual(len(data['results']), 2)
 
-    def test_status_filter_active(self):
-        _make_project(self.startup, title='Active One', status=True)
-        _make_project(self.startup, title='Inactive One', status=False)
-        response = self.client.get(self.url + '?status=active')
+    def test_status_filter_idea(self):
+        _make_project(self.startup, title='Active One', status='idea')
+        _make_project(self.startup, title='Inactive One', status='closed')
+        response = self.client.get(self.url + '?status=idea')
         data = response.json()
 
         self.assertEqual(data['count'], 1)
         self.assertEqual(data['results'][0]['title'], 'Active One')
 
-    def test_status_filter_inactive(self):
-        _make_project(self.startup, title='Active One', status=True)
-        _make_project(self.startup, title='Inactive One', status=False)
-        response = self.client.get(self.url + '?status=inactive')
+    def test_status_filter_closed(self):
+        _make_project(self.startup, title='Active One', status='idea')
+        _make_project(self.startup, title='Inactive One', status='closed')
+        response = self.client.get(self.url + '?status=closed')
         data = response.json()
 
         self.assertEqual(data['count'], 1)
@@ -230,8 +230,8 @@ class StartupProjectListAPITests(TestCase):
 
     def test_invalid_status_param_is_ignored(self):
         """An unrecognised ?status value must not filter the queryset."""
-        _make_project(self.startup, title='Active One', status=True)
-        _make_project(self.startup, title='Inactive One', status=False)
+        _make_project(self.startup, title='Active One', status='idea')
+        _make_project(self.startup, title='Inactive One', status='closed')
         response = self.client.get(self.url + '?status=abc')
         data = response.json()
 

@@ -12,7 +12,7 @@ from startups.serializers import StartupPublicProfileSerializer
 class StartupPublicProfileView(RetrieveAPIView):
     queryset = StartupProfile.objects.annotate(
         followers_count=Count('savedstartup', distinct=True),
-        projects_count=Count('project', distinct=True),
+        projects_count=Count('projects', distinct=True),
     )
     serializer_class = StartupPublicProfileSerializer
 
@@ -32,9 +32,9 @@ class StartupProjectListView(ListAPIView):
         startup = get_object_or_404(StartupProfile, pk=startup_id)
         qs = Project.objects.filter(startup=startup)
 
-        VALID_STATUSES = {'active': True, 'inactive': False}
+        VALID_STATUSES = {'idea', 'mvp', 'fundraising', 'funded', 'closed'}
         status_param = self.request.query_params.get('status', '').lower()
         if status_param in VALID_STATUSES:
-            qs = qs.filter(status=VALID_STATUSES[status_param])
+            qs = qs.filter(status=status_param)
 
         return qs.order_by('-created_at')
