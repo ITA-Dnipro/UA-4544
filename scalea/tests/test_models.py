@@ -6,10 +6,6 @@ from startups.models import StartupProfile
 
 User = get_user_model()
 
-ROLE_ADMIN = 1
-ROLE_STARTUP = 2
-ROLE_INVESTOR = 3
-
 @pytest.mark.django_db
 @pytest.mark.models
 class TestModels:
@@ -19,17 +15,17 @@ class TestModels:
             email="test@scalea.com",
             username="testuser",
             password="password123",
-            role_id=ROLE_ADMIN
+            is_verified=True
         )
         assert user.email == "test@scalea.com"
-        assert user.role_id == ROLE_ADMIN
+        assert user.is_verified is True
 
     def test_startup_profile_creation(self):
         owner = User.objects.create_user(
             email="founder@scalea.com",
             username="founder",
             password="password123",
-            role_id=ROLE_STARTUP
+            is_startup=True
         )
         startup = StartupProfile.objects.create(
             user=owner,
@@ -37,10 +33,14 @@ class TestModels:
             description="Testing coverage"
         )
         assert startup.company_name == "Scalea Innovation"
-        assert startup.user == owner
+        assert owner.is_startup is True
 
     def test_project_creation(self):
-        owner = User.objects.create_user(email="p@s.com", username="p", role_id=ROLE_STARTUP)
+        owner = User.objects.create_user(
+            email="p@s.com", 
+            username="p", 
+            is_startup=True
+        )
         startup = StartupProfile.objects.create(user=owner, company_name="Project Base")
 
         project = Project.objects.create(
@@ -54,11 +54,16 @@ class TestModels:
         assert project.title == "AI Engine"
 
     def test_investment_flow(self):
-        inv_user = User.objects.create_user(email="i@s.com", username="inv", role_id=ROLE_INVESTOR)
+        inv_user = User.objects.create_user(
+            email="i@s.com", 
+            username="inv", 
+            is_investor=True
+        )
         investor = InvestorProfile.objects.create(user=inv_user, company_name="VC Fund")
 
-        owner = User.objects.create_user(email="f@s.com", username="f", role_id=ROLE_STARTUP)
+        owner = User.objects.create_user(email="f@s.com", username="f", is_startup=True)
         startup = StartupProfile.objects.create(user=owner, company_name="Target")
+        
         project = Project.objects.create(
             startup=startup, title="App", status=True,
             short_description="S", description="L", current_funding=0
@@ -70,3 +75,4 @@ class TestModels:
             amount=1000.00
         )
         assert investment.amount == 1000.00
+        assert inv_user.is_investor is True
