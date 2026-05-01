@@ -4,6 +4,7 @@ from users.models import User
 from startups.models import StartupProfile
 
 
+
 class StartupProfileModelTests(TestCase):
     def test_startup_profile_creation(self):
         user = User.objects.create_user(

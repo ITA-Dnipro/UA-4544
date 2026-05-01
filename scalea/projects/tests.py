@@ -1,3 +1,7 @@
+
+from django.test import TestCase
+from startups.models import StartupProfile
+
 from decimal import Decimal
 
 from django.test import TestCase
@@ -5,6 +9,7 @@ from startups.models import StartupProfile
 from users.models import User
 
 from projects.models import Project, ProjectStatus, ProjectVisibility
+
 
 
 class ProjectModelTests(TestCase):

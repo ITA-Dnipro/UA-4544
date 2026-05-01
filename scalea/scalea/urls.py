@@ -22,7 +22,8 @@ from django.urls import include, path
 
 
 def health_check(_request):
-    return JsonResponse({'status': 'ok'})
+
+    return JsonResponse({"status": "ok"})
 
 
 urlpatterns = [

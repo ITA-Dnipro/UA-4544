@@ -1,3 +1,7 @@
+
+
+# Create your views here.
+
 import logging
 
 from django.conf import settings
@@ -109,3 +113,4 @@ class RegisterView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
