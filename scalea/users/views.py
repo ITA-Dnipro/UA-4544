@@ -15,7 +15,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .security import clear_failures, is_locked, register_failure
-from .serializers import (
+from .models import PasswordResetAudit
+from users.serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -39,33 +40,38 @@ class PasswordResetRequestView(APIView):
 
         user = User.objects.filter(email=email).first()
 
+        PasswordResetAudit.objects.create(
+            user=user,
+            email=email,
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/?token={token}&uid={uid}"
 
             html_message = render_to_string(
                 'email/password_reset.html',
-                {
-                    'reset_url': reset_url,
-                },
+                {'reset_url': reset_url},
             )
+
             email_msg = EmailMultiAlternatives(
                 subject='Password Reset — Scalea',
                 body=f'Reset your password: {reset_url}',
-                from_email=settings.EMAIL_HOST_USER,
+                from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
             )
             email_msg.attach_alternative(html_message, 'text/html')
+
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email')
+                logger.exception('Failed to send password reset email to %s', email)
 
         return Response(
-            {'detail': 'If this email exists, you will receive a reset link.'},
+            {'detail': 'If the email exists, you will receive reset instructions.'},
             status=status.HTTP_200_OK,
         )
 
