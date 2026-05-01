@@ -1,10 +1,10 @@
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
+from projects.models import Project
+from projects.serializers import ProjectCardSerializer
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
 
-from projects.models import Project
-from projects.serializers import ProjectCardSerializer
 from startups.models import StartupProfile
 from startups.serializers import StartupPublicProfileSerializer
 
