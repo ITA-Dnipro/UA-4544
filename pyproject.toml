@@ -15,7 +15,8 @@ dev = [
   "ruff==0.15.11",
   "pre-commit==4.5.1",
   "pytest",
-  "pytest-cov"
+  "pytest-cov",
+  "pytest-django"
 ]
 
 [tool.setuptools.packages.find]
@@ -67,3 +68,7 @@ mccabe.max-complexity = 10
 quote-style = "single"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "scalea.settings"
+python_files = "tests.py test_*.py *_tests.py"
