@@ -142,16 +142,16 @@ class StartupProjectListAPITests(TestCase):
 
         self.assertIn('id', card)
         self.assertEqual(card['title'], 'Handmade Chairs')
-        self.assertEqual(card['status'], 'idea')
+        self.assertEqual(card['status'], 'active')
         self.assertIn('thumbnail', card)
         self.assertEqual(card['short_description'], 'Fine woodwork.')
 
-    def test_closed_project_status_string(self):
+    def test_inactive_project_status_string(self):
         _make_project(self.startup, title='Dormant', status='closed')
         response = self.client.get(self.url)
         card = response.json()['results'][0]
 
-        self.assertEqual(card['status'], 'closed')
+        self.assertEqual(card['status'], 'inactive')
 
     def test_count_reflects_total_projects(self):
         for i in range(4):
@@ -177,6 +177,14 @@ class StartupProjectListAPITests(TestCase):
 
         self.assertEqual(len(data['results']), 3)
 
+    def test_max_page_size_is_respected(self):
+        for i in range(105):
+            _make_project(self.startup, title=f'Project {i}')
+        response = self.client.get(self.url + '?page_size=500')
+        data = response.json()
+
+        self.assertEqual(len(data['results']), 100)
+
     def test_second_page_returns_remaining_items(self):
         for i in range(8):
             _make_project(self.startup, title=f'Project {i}')
@@ -185,19 +193,19 @@ class StartupProjectListAPITests(TestCase):
 
         self.assertEqual(len(data['results']), 2)
 
-    def test_status_filter_idea(self):
+    def test_status_filter_active(self):
         _make_project(self.startup, title='Active One', status='idea')
         _make_project(self.startup, title='Inactive One', status='closed')
-        response = self.client.get(self.url + '?status=idea')
+        response = self.client.get(self.url + '?status=active')
         data = response.json()
 
         self.assertEqual(data['count'], 1)
         self.assertEqual(data['results'][0]['title'], 'Active One')
 
-    def test_status_filter_closed(self):
+    def test_status_filter_inactive(self):
         _make_project(self.startup, title='Active One', status='idea')
         _make_project(self.startup, title='Inactive One', status='closed')
-        response = self.client.get(self.url + '?status=closed')
+        response = self.client.get(self.url + '?status=inactive')
         data = response.json()
 
         self.assertEqual(data['count'], 1)
