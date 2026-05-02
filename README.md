@@ -36,6 +36,121 @@ The registration endpoint (`POST /api/auth/register/`) always returns `201` with
 If the email already exists and the user is already verified, the backend performs no side effects.
 If the email exists but is not yet verified, the backend may re-send the verification email.
 
+### Login Endpoint
+
+The login endpoint (`POST /api/auth/login/`) authenticates a user using email, password, and selected role, and returns JWT access and refresh tokens.
+
+#### Endpoint
+
+**POST** `/api/auth/login/`
+
+#### Request Body
+
+```json
+{
+  "email": "user@example.com",
+  "password": "P@ssw0rd",
+  "role": "startup",
+  "remember": true
+}
+```
+
+#### Request Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | string | yes | User email address |
+| `password` | string | yes | User password |
+| `role` | string | yes | Selected login role: `startup` or `investor` |
+| `remember` | boolean | no | If `true`, extends refresh token lifetime to 30 days and access token lifetime to 12 hours |
+
+#### Success Response: `200 OK`
+
+```json
+{
+  "access": "<jwt-access-token>",
+  "refresh": "<jwt-refresh-token>",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "role": "startup"
+  }
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `access` | string | JWT access token |
+| `refresh` | string | JWT refresh token |
+| `user.id` | integer | User ID |
+| `user.email` | string | User email |
+| `user.role` | string | Authenticated role selected during login |
+
+#### Error Responses
+
+**`400 Bad Request`** — invalid or missing fields
+
+```json
+{
+  "role": ["This field is required."]
+}
+```
+
+**`401 Unauthorized`** — invalid credentials or role mismatch
+
+```json
+{
+  "detail": ["Invalid email or password."]
+}
+```
+
+**`429 Too Many Requests`** — temporary lockout after repeated failed attempts
+
+```json
+{
+  "detail": ["Too many failed attempts. Try again later."]
+}
+```
+
+#### Security Features
+
+✅ **Generic authentication failure**
+- Returns the same `401` message for:
+  - invalid email
+  - wrong password
+  - wrong role
+- Prevents account enumeration and role discovery
+
+✅ **Role-aware authentication**
+- Users must choose a role (`startup` or `investor`) during login
+- Login succeeds only if the authenticated user has the selected role
+- Users with both roles may log in as either role
+
+✅ **Brute-force protection**
+- Failed attempts are tracked per email
+- After repeated failures, login is temporarily locked
+
+✅ **Throttle protection**
+- Login endpoint is protected with DRF scoped throttling
+
+#### Token Lifetime Policy
+
+- Default access token lifetime is controlled by `SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']`
+- Default refresh token lifetime is controlled by `SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']`
+- If `remember=true`:
+  - refresh token lifetime is extended to **30 days**
+  - access token lifetime is extended to **12 hours**
+
+#### API Usage Example
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "P@ssw0rd", "role": "startup", "remember": true}'
+```
+
 ### Password Reset Flow
 
 The password reset endpoint (`POST /api/auth/password-reset/`) implements a secure password reset mechanism with anti-enumeration protection.
@@ -320,8 +435,7 @@ pre-commit run frontend-eslint --all-files
 
 #### GitHub Actions
 
-Pylint is also run automatically on each push or pull request to the developer branch using GitHub Actions.
-You can find the configuration in .github/workflows/pylint.yml.
+Ruff checks are run locally via pre-commit and should also be enforced in CI
 
 **Local Development with Docker**
 

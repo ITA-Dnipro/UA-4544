@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -10,9 +10,8 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from startups.models import StartupProfile
 
+from users.models import User
 from users.tokens import password_reset_token
-
-User = get_user_model()
 
 
 class UserModelTests(TestCase):
@@ -178,3 +177,164 @@ class PasswordResetConfirmViewTest(APITestCase):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestLoginApi(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.password = 'P@ssw0rd123'
+        self.role = 'startup'
+        self.user = User.objects.create_user(
+            email='user@example.com',
+            username='user@example.com',
+            password=self.password,
+            is_active=True,
+            is_startup=True,
+            is_investor=True,
+        )
+        self.url = reverse('auth-login')
+
+    def test_valid_credentials_returns_200_with_tokens(self):
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('access', res.data)
+        self.assertIn('refresh', res.data)
+        self.assertEqual(res.data['user']['email'], 'user@example.com')
+        self.assertEqual(res.data['user']['role'], 'startup')
+
+    def test_wrong_password_returns_401_generic(self):
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': 'wrongpass',
+                'role': self.role,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Invalid email or password.')
+
+    def test_lockout_after_5_failed_attempts(self):
+        for _ in range(5):
+            self.client.post(
+                self.url,
+                {
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
+                },
+                format='json',
+            )
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Too many failed attempts. Try again later.')
+
+    def test_successful_login_clears_fail_counter(self):
+        # Accumulate 4 failures (one below the lockout threshold of 5)
+        for _ in range(4):
+            self.client.post(
+                self.url,
+                {
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
+                },
+                format='json',
+            )
+
+        # Successful login — should clear the failure counter
+        ok = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+            },
+            format='json',
+        )
+        self.assertEqual(ok.status_code, status.HTTP_200_OK)
+
+        # If counter was NOT cleared, this 5th failure would trigger lockout (429)
+        # If counter WAS cleared, this is only the 1st failure → 401
+        post_login_failure = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
+            },
+            format='json',
+        )
+        self.assertEqual(
+            post_login_failure.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+            'Counter was not cleared after login — lockout triggered prematurely',
+        )
+
+    def test_remember_true_returns_200(self):
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+                'remember': True,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_wrong_role_returns_401_generic(self):
+        self.user.is_startup = True
+        self.user.is_investor = False
+        self.user.save()
+
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': 'investor',
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        detail = res.data.get('detail')
+        if isinstance(detail, list):
+            detail = detail[0]
+        self.assertEqual(detail, 'Invalid email or password.')
+
+    def test_missing_role_returns_400(self):
+        res = self.client.post(
+            self.url,
+            {
+                'email': 'user@example.com',
+                'password': self.password,
+            },
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('role', res.data)
