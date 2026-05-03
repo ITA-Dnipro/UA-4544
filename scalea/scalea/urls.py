@@ -28,6 +28,7 @@ def health_check(_request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health_check),
+    path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
 ]
