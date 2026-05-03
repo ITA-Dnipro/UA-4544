@@ -346,6 +346,39 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 
 ## Automation & Quality
 
+### CI Pipeline
+
+This project uses **GitHub Actions** for continuous integration.
+
+#### Jobs
+
+| Job | What it runs |
+|-----|-------------|
+| `lint-and-test` | Ruff lint, Ruff format, Codecov |
+| `frontend-build` | ESLint, TypeScript check, Vite production build |
+
+#### Triggers
+
+- Push to `main` or `develop`
+- Pull requests to `main` or `develop`
+
+#### Running CI checks locally
+
+**Backend:**
+```bash
+ruff check scalea/
+ruff format --check scalea/
+pytest --cov=scalea
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run lint
+npm run build
+```
+
 ### Code Coverage
 Project uses **Codecov** to monitor test coverage and ensure code reliability.
 
