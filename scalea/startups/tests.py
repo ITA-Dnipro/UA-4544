@@ -9,15 +9,14 @@ User = get_user_model()
 
 
 def _make_user(username, email, **kwargs):
-    return User.objects.create_user(
-        username=username,
-        email=email,
-        password='123qwe!@#',
-        is_startup=True,
-        is_investor=False,
-        is_verified=True,
-        **kwargs,
-    )
+    defaults = {
+        'password': '123qwe!@#',
+        'is_startup': True,
+        'is_investor': False,
+        'is_verified': True,
+    }
+    defaults.update(kwargs)
+    return User.objects.create_user(username=username, email=email, **defaults)
 
 
 def _make_startup(user, **kwargs):

@@ -15,6 +15,18 @@ class ProjectStatus(models.TextChoices):
     CLOSED = 'closed', 'Closed'
 
 
+PROJECT_ACTIVE_STATUSES = [
+    ProjectStatus.IDEA,
+    ProjectStatus.MVP,
+    ProjectStatus.FUNDRAISING,
+]
+
+PROJECT_INACTIVE_STATUSES = [
+    ProjectStatus.FUNDED,
+    ProjectStatus.CLOSED,
+]
+
+
 class ProjectVisibility(models.TextChoices):
     PUBLIC = 'public', 'Public'
     PRIVATE = 'private', 'Private'

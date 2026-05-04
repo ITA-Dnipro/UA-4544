@@ -1,6 +1,6 @@
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
-from projects.models import Project
+from projects.models import Project, PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES
 from projects.serializers import ProjectCardSerializer
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -34,8 +34,8 @@ class StartupProjectListView(ListAPIView):
 
         status_param = self.request.query_params.get('status', '').lower()
         if status_param == 'active':
-            qs = qs.filter(status__in=['idea', 'mvp', 'fundraising'])
+            qs = qs.filter(status__in=PROJECT_ACTIVE_STATUSES)
         elif status_param == 'inactive':
-            qs = qs.filter(status__in=['funded', 'closed'])
+            qs = qs.filter(status__in=PROJECT_INACTIVE_STATUSES)
 
         return qs.order_by('-created_at')

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from projects.models import Project
+from projects.models import Project, PROJECT_ACTIVE_STATUSES
 
 
 class ProjectCardSerializer(serializers.ModelSerializer):
@@ -12,7 +12,7 @@ class ProjectCardSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'status', 'thumbnail', 'short_description']
 
     def get_status(self, obj):
-        return 'active' if obj.status in ['idea', 'mvp', 'fundraising'] else 'inactive'
+        return 'active' if obj.status in PROJECT_ACTIVE_STATUSES else 'inactive'
 
     def get_thumbnail(self, _obj):
         """Project has no image field yet; return None until one is added."""
