@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from projects.models import Project, PROJECT_ACTIVE_STATUSES
+from projects.models import PROJECT_ACTIVE_STATUSES, Project
 
 
 class ProjectCardSerializer(serializers.ModelSerializer):
