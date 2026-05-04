@@ -13,9 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
+    
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -23,20 +24,17 @@ jobs:
      
       - name: Install dependencies
         run: |
-          cd scalea
           pip install -e ".[dev]"
           pip install ruff pytest-cov
 
       - name: Ruff lint check
-        run: cd scalea && ruff check .
+        run: ruff check scalea/
 
       - name: Ruff format check
-        run: cd scalea && ruff format --check .
+        run: ruff format --check scalea/
 
       - name: Run tests with coverage
-        run: |
-          cd scalea
-          pytest --cov=. --cov-report=xml
+        run: pytest --cov=scalea --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

@@ -1,6 +1,8 @@
 # UA-4544
-
-
+![CI Status](https://github.com/ITA-Dnipro/UA-4544/actions/workflows/ci.yml/badge.svg)
+![Codecov](https://codecov.io/gh/ITA-Dnipro/UA-4544/branch/develop/graph/badge.svg)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen.svg)
 
 UA-4544 Project-based learning Full Stack Python/React
 
@@ -230,16 +232,20 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 ## Automation & Quality
 
 ### Code Coverage
-Project uses Codecov for coverage reporting.
+Project uses **Codecov** to monitor test coverage and ensure code reliability.
+
+* **Automation:** Coverage is uploaded automatically as part of the CI pipeline
+* **Setup:** CI includes a Codecov upload step.
+
 To enable coverage upload:
-1. Create `CODECOV_TOKEN` in GitHub Secrets
-2. Run CI pipeline
+1. Add `CODECOV_TOKEN` to **Settings > Secrets and variables > Actions**.
+2. Run the CI pipeline
 
 ### Dependabot
-Dependabot is enabled for:
-- GitHub Actions
-- Python (pip)
-- Frontend dependencies (npm)
+**Dependabot** is enabled to keep dependencies up to date and secure. It monitors:
+* **GitHub Actions** (CI/CD workflows)
+* **Python** (pip)
+* **Frontend** (npm packages)
 
 #### Step 1: Installation
 
@@ -247,7 +253,7 @@ Dependabot is enabled for:
 
 **Command:**
 
-```
+```bash
 pip install -e .
 ```
 
@@ -255,34 +261,44 @@ For developers, there is an additional layer of dependencies to install.
 
 **Command:**
 
-```
+```bash
 pip install -e ".[dev]"
 ```
 
 #### Step 2: Running the linter
 Install packages from the `dev` extras to get access to the linter and formatter.
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) as the single tool for:
-- linting
-- import sorting
-- formatting
+This project uses:
+- **Ruff** for Python linting/formatting (backend)
+- **ESLint** for TypeScript/React linting (frontend)
 
-Pre-commit hooks are configured to run Ruff on staged files before each commit.
-```bash
-pre-commit install
-pre-commit run --all-files
-```
+##### Backend (Python) — Ruff
+(From project root)
 
-**Action**: To lint and format your staged files, run the following command from the project root:
+To lint and format your staged files, run the following command from the project root:
 ```bash
 ruff check .
 ruff check . --fix
 ruff format .
 ```
 
-**Command:**
+##### Frontend (React) — ESLint
+(From `frontend` directory)
 
+To lint and format your staged files, run the following command:
+```bash
+npm install
+npm run lint
+npm run lint:fix
 ```
+
+##### Install & Run pre-commit
+**Command:**
+```bash
+pre-commit install
+```
+
+```bash
 pre-commit run
 ```
 
@@ -290,8 +306,16 @@ Alternatively, if you want to lint and format all files, run:
 
 **Command:**
 
-```
+```bash
 pre-commit run --all-files
+```
+
+Run specific hooks:
+**Command:**
+```bash
+pre-commit run ruff-check --all-files
+pre-commit run ruff-format --all-files
+pre-commit run frontend-eslint --all-files
 ```
 
 #### GitHub Actions
