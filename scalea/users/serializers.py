@@ -7,7 +7,6 @@ from rest_framework import serializers
 
 from investors.models import InvestorProfile
 from startups.models import StartupProfile
-
 from users.services import send_email_verification
 
 
