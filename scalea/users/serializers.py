@@ -99,3 +99,40 @@ class RegisterSerializer(serializers.Serializer):
         # This is a placeholder to allow the registration schema to merge and
         # NO email is actually dispatched.
         pass
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    remember = serializers.BooleanField(required=False, default=False)
+    role = serializers.ChoiceField(choices=['startup', 'investor'], required=True)
+
+    def validate(self, attrs):
+        email = attrs['email'].strip().lower()
+        password = attrs['password']
+        requested_role = attrs['role']
+
+        user = User.objects.filter(email=email).first()
+
+        if not user or not user.check_password(password) or not user.is_active:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
+
+        if requested_role == 'startup' and not user.is_startup:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
+
+        if requested_role == 'investor' and not user.is_investor:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
+
+        attrs['user'] = user
+        attrs['email'] = email
+        attrs['role'] = requested_role
+        return attrs

@@ -57,5 +57,10 @@ jobs:
           rm -f package-lock.json
           npm install
 
+      - name: ESLint check
+        working-directory: frontend
+        run: npm run lint
+
       - name: Build frontend
-        run: cd frontend && npm run build
+        working-directory: frontend
+        run: npm run build
