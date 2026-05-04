@@ -20,9 +20,15 @@ from rest_framework_simplejwt.token_blacklist.models import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .security import clear_failures, is_locked, register_failure
+from .security import (
+    clear_failures,
+    is_locked,
+    is_password_reset_locked,
+    register_failure,
+    register_password_reset_request,
+)
 from .models import PasswordResetAudit
-from .serializers import (
+from users.serializers import (
     LoginSerializer,
     LogoutSerializer,
     PasswordResetConfirmSerializer,
@@ -45,6 +51,16 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
+        if is_password_reset_locked(email):
+            return Response(
+                {
+                    'detail': 'Too many password reset requests for this email. Try again later.'
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        register_password_reset_request(email)
+
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
@@ -57,8 +73,7 @@ class PasswordResetRequestView(APIView):
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/?token={token}.{uid}"
 
             html_message = render_to_string(
                 'email/password_reset.html',
