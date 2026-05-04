@@ -14,13 +14,20 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .security import clear_failures, is_locked, register_failure
-from .models import PasswordResetAudit
 from users.serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
+)
+
+from .models import PasswordResetAudit
+from .security import (
+    clear_failures,
+    is_locked,
+    is_password_reset_locked,
+    register_failure,
+    register_password_reset_request,
 )
 from .tokens import password_reset_token
 
@@ -38,19 +45,29 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
+        if is_password_reset_locked(email):
+            return Response(
+                {
+                    'detail': 'Too many password reset requests for this email. Try again later.'
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        register_password_reset_request(email)
+
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
-            user=user,
-            email=email,
-            ip_address=request.META.get('REMOTE_ADDR')
+            user=user, email=email, ip_address=request.META.get('REMOTE_ADDR')
         )
 
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-            reset_url = f"{settings.FRONTEND_URL}/reset-password/?token={token}&uid={uid}"
+            reset_url = (
+                f'{settings.FRONTEND_URL}/reset-password/?token={token}&uid={uid}'
+            )
 
             html_message = render_to_string(
                 'email/password_reset.html',
