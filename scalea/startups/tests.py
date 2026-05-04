@@ -3,6 +3,8 @@ from django.urls import reverse
 
 from startups.models import StartupProfile
 
+User = get_user_model()
+
 
 def _make_user(username, email, **kwargs):
     return User.objects.create_user(
