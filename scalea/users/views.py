@@ -27,7 +27,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(APIView):        
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -66,7 +68,9 @@ class PasswordResetRequestView(APIView):
         )
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(APIView):        
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

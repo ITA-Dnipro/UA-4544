@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import styles from "./PasswordReset.module.css";
 
@@ -10,8 +10,8 @@ interface IResetConfirmForm {
 }
 
 const PasswordResetConfirm: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { token } = useParams<{ token: string }>();
 
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +19,6 @@ const PasswordResetConfirm: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState<boolean>(false);
-
-  const token = searchParams.get("token");
 
   const {
     register,
@@ -43,7 +41,7 @@ const PasswordResetConfirm: React.FC = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token,
+          token: token ?? "",
           password: data.password,
         }),
       });

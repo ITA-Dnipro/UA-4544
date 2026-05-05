@@ -23,7 +23,10 @@ export default function AppRouter() {
         <Route path="/dashboard" element={<InvestorDashboard />} />
         <Route path="/messages" element={<Inbox />} />
         <Route path="/password-reset" element={<PasswordResetRequest />} />
-        <Route path="/reset-password" element={<PasswordResetConfirm />} />
+        <Route
+          path="/reset-password/:token"
+          element={<PasswordResetConfirm />}
+        />
       </Routes>
     </BrowserRouter>
   );
