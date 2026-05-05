@@ -5,12 +5,12 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-from startups.models import StartupProfile
 
+from investors.models import InvestorProfile
+from startups.models import StartupProfile
 from users.models import User
 from users.tokens import password_reset_token
 
@@ -18,16 +18,16 @@ from users.tokens import password_reset_token
 class UserModelTests(TestCase):
     def test_user_creation_with_role_flags(self):
         user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
-            password="123qwe!@#",
+            username='testuser',
+            email='test@example.com',
+            password='123qwe!@#',
             is_startup=True,
             is_investor=False,
             is_verified=True,
         )
 
-        self.assertEqual(user.username, "testuser")
-        self.assertEqual(user.email, "test@example.com")
+        self.assertEqual(user.username, 'testuser')
+        self.assertEqual(user.email, 'test@example.com')
         self.assertTrue(user.is_startup)
         self.assertFalse(user.is_investor)
         self.assertTrue(user.is_verified)
@@ -36,48 +36,48 @@ class UserModelTests(TestCase):
 class RegistrationAPITests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.url = reverse("register")
+        self.url = reverse('register')
         self.valid_startup_data = {
-            "email": "startup@example.com",
-            "password": "StrongPassword123!",
-            "role": "startup",
-            "company_name": "Tech Future",
-            "short_pitch": "We build AI solutions.",
+            'email': 'startup@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'startup',
+            'company_name': 'Tech Future',
+            'short_pitch': 'We build AI solutions.',
         }
 
     def test_successful_startup_registration(self):
         response = self.client.post(self.url, self.valid_startup_data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(User.objects.filter(email="startup@example.com").exists())
+        self.assertTrue(User.objects.filter(email='startup@example.com').exists())
         self.assertTrue(
-            StartupProfile.objects.filter(company_name="Tech Future").exists()
+            StartupProfile.objects.filter(company_name='Tech Future').exists()
         )
 
-        user = User.objects.get(email="startup@example.com")
+        user = User.objects.get(email='startup@example.com')
         self.assertFalse(user.is_active)
 
     def test_successful_investor_registration(self):
         data = {
-            "email": "investor@example.com",
-            "password": "StrongPassword123!",
-            "role": "investor",
-            "bio": "Experienced angel investor.",
-            "investment_focus": "SaaS",
+            'email': 'investor@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'investor',
+            'bio': 'Experienced angel investor.',
+            'investment_focus': 'SaaS',
         }
         response = self.client.post(self.url, data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(
-            InvestorProfile.objects.filter(user__email="investor@example.com").exists()
+            InvestorProfile.objects.filter(user__email='investor@example.com').exists()
         )
 
     def test_registration_duplicate_email_returns_201_and_masks_existence(self):
-        existing_email = "startup@example.com"
+        existing_email = 'startup@example.com'
         User.objects.create_user(
             username=existing_email,
             email=existing_email,
-            password="Password123!",
+            password='Password123!',
         )
         initial_count = User.objects.count()
 
@@ -85,28 +85,28 @@ class RegistrationAPITests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            response.data["detail"], "Verification email sent. Please check your inbox."
+            response.data['detail'], 'Verification email sent. Please check your inbox.'
         )
         self.assertEqual(User.objects.count(), initial_count)
 
     def test_registration_weak_password_returns_400(self):
         data = self.valid_startup_data.copy()
-        data["password"] = "123"
+        data['password'] = '123'
 
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("password", response.data)
+        self.assertIn('password', response.data)
 
     def test_registration_invalid_email_returns_400(self):
         data = self.valid_startup_data.copy()
-        data["email"] = "not-an-email"
+        data['email'] = 'not-an-email'
 
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_registration_missing_role_returns_400(self):
         data = self.valid_startup_data.copy()
-        data.pop("role")
+        data.pop('role')
 
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -115,49 +115,49 @@ class RegistrationAPITests(TestCase):
 class PasswordResetRequestViewTest(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@gmail.com",
-            password="OldP@ssword1",
+            username='testuser',
+            email='test@gmail.com',
+            password='OldP@ssword1',
         )
-        self.url = "/api/auth/password-reset/"
+        self.url = '/api/auth/password-reset/'
 
-    @patch("users.views.EmailMultiAlternatives.send")
+    @patch('users.views.EmailMultiAlternatives.send')
     def test_returns_200_if_email_exists(self, _mock_send):
-        response = self.client.post(self.url, {"email": "test@gmail.com"})
+        response = self.client.post(self.url, {'email': 'test@gmail.com'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_returns_200_if_email_not_exists(self):
-        response = self.client.post(self.url, {"email": "nobody@gmail.com"})
+        response = self.client.post(self.url, {'email': 'nobody@gmail.com'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_invalid_email_returns_400(self):
-        response = self.client.post(self.url, {"email": "notanemail"})
+        response = self.client.post(self.url, {'email': 'notanemail'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class PasswordResetConfirmViewTest(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser2",
-            email="test@gmail.com",
-            password="OldP@ssword1",
+            username='testuser2',
+            email='test@gmail.com',
+            password='OldP@ssword1',
         )
         self.uid = urlsafe_base64_encode(force_bytes(self.user.pk))
         self.token = password_reset_token.make_token(self.user)
-        self.combined_token = f"{self.uid}.{self.token}"
-        self.url = "/api/auth/password-reset/confirm/"
+        self.combined_token = f'{self.uid}.{self.token}'
+        self.url = '/api/auth/password-reset/confirm/'
 
     def test_valid_token_changes_password(self):
         response = self.client.post(
             self.url,
             {
-                "token": self.combined_token,
-                "password": "NewP@ssword1",
+                'token': self.combined_token,
+                'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password("NewP@ssword1"))
+        self.assertTrue(self.user.check_password('NewP@ssword1'))
 
     def test_password_reset_revokes_existing_refresh_tokens(self):
         refresh = str(RefreshToken.for_user(self.user))
@@ -165,14 +165,14 @@ class PasswordResetConfirmViewTest(APITestCase):
         reset_response = self.client.post(
             self.url,
             {
-                "token": self.combined_token,
-                "password": "NewP@ssword1",
+                'token': self.combined_token,
+                'password': 'NewP@ssword1',
             },
         )
         refresh_response = self.client.post(
-            "/api/auth/refresh/",
-            {"refresh": refresh},
-            format="json",
+            '/api/auth/refresh/',
+            {'refresh': refresh},
+            format='json',
         )
 
         self.assertEqual(reset_response.status_code, status.HTTP_200_OK)
@@ -182,8 +182,8 @@ class PasswordResetConfirmViewTest(APITestCase):
         response = self.client.post(
             self.url,
             {
-                "token": f"{self.uid}.invalid-token-123",
-                "password": "NewP@ssword1",
+                'token': f'{self.uid}.invalid-token-123',
+                'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -192,8 +192,8 @@ class PasswordResetConfirmViewTest(APITestCase):
         response = self.client.post(
             self.url,
             {
-                "token": f"invaliduid.{self.token}",
-                "password": "NewP@ssword1",
+                'token': f'invaliduid.{self.token}',
+                'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -202,75 +202,75 @@ class PasswordResetConfirmViewTest(APITestCase):
 class TestLoginApi(APITestCase):
     def setUp(self):
         cache.clear()
-        self.password = "P@ssw0rd123"
-        self.role = "startup"
+        self.password = 'P@ssw0rd123'
+        self.role = 'startup'
         self.user = User.objects.create_user(
-            email="user@example.com",
-            username="user@example.com",
+            email='user@example.com',
+            username='user@example.com',
             password=self.password,
             is_active=True,
             is_startup=True,
             is_investor=True,
         )
-        self.url = reverse("auth-login")
+        self.url = reverse('auth-login')
 
     def test_valid_credentials_returns_200_with_tokens(self):
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": self.password,
-                "role": self.role,
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertIn("access", res.data)
-        self.assertIn("refresh", res.data)
-        self.assertEqual(res.data["user"]["email"], "user@example.com")
-        self.assertEqual(res.data["user"]["role"], "startup")
+        self.assertIn('access', res.data)
+        self.assertIn('refresh', res.data)
+        self.assertEqual(res.data['user']['email'], 'user@example.com')
+        self.assertEqual(res.data['user']['role'], 'startup')
 
     def test_wrong_password_returns_401_generic(self):
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": "wrongpass",
-                "role": self.role,
+                'email': 'user@example.com',
+                'password': 'wrongpass',
+                'role': self.role,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-        detail = res.data.get("detail")
+        detail = res.data.get('detail')
         if isinstance(detail, list):
             detail = detail[0]
-        self.assertEqual(detail, "Invalid email or password.")
+        self.assertEqual(detail, 'Invalid email or password.')
 
     def test_lockout_after_5_failed_attempts(self):
         for _ in range(5):
             self.client.post(
                 self.url,
                 {
-                    "email": "user@example.com",
-                    "password": "wrong",
-                    "role": self.role,
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
                 },
-                format="json",
+                format='json',
             )
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": "wrong",
-                "role": self.role,
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
-        detail = res.data.get("detail")
+        detail = res.data.get('detail')
         if isinstance(detail, list):
             detail = detail[0]
-        self.assertEqual(detail, "Too many failed attempts. Try again later.")
+        self.assertEqual(detail, 'Too many failed attempts. Try again later.')
 
     def test_successful_login_clears_fail_counter(self):
         # Accumulate 4 failures (one below the lockout threshold of 5)
@@ -278,22 +278,22 @@ class TestLoginApi(APITestCase):
             self.client.post(
                 self.url,
                 {
-                    "email": "user@example.com",
-                    "password": "wrong",
-                    "role": self.role,
+                    'email': 'user@example.com',
+                    'password': 'wrong',
+                    'role': self.role,
                 },
-                format="json",
+                format='json',
             )
 
         # Successful login — should clear the failure counter
         ok = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": self.password,
-                "role": self.role,
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(ok.status_code, status.HTTP_200_OK)
 
@@ -302,28 +302,28 @@ class TestLoginApi(APITestCase):
         post_login_failure = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": "wrong",
-                "role": self.role,
+                'email': 'user@example.com',
+                'password': 'wrong',
+                'role': self.role,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(
             post_login_failure.status_code,
             status.HTTP_401_UNAUTHORIZED,
-            "Counter was not cleared after login — lockout triggered prematurely",
+            'Counter was not cleared after login — lockout triggered prematurely',
         )
 
     def test_remember_true_returns_200(self):
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": self.password,
-                "role": self.role,
-                "remember": True,
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': self.role,
+                'remember': True,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
@@ -335,105 +335,105 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": self.password,
-                "role": "investor",
+                'email': 'user@example.com',
+                'password': self.password,
+                'role': 'investor',
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-        detail = res.data.get("detail")
+        detail = res.data.get('detail')
         if isinstance(detail, list):
             detail = detail[0]
-        self.assertEqual(detail, "Invalid email or password.")
+        self.assertEqual(detail, 'Invalid email or password.')
 
     def test_missing_role_returns_400(self):
         res = self.client.post(
             self.url,
             {
-                "email": "user@example.com",
-                "password": self.password,
+                'email': 'user@example.com',
+                'password': self.password,
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("role", res.data)
+        self.assertIn('role', res.data)
 
 
 class RefreshAndLogoutApiTests(APITestCase):
     def setUp(self):
         cache.clear()
-        self.password = "P@ssw0rd123"
+        self.password = 'P@ssw0rd123'
         self.user = User.objects.create_user(
-            email="refresh@example.com",
-            username="refresh@example.com",
+            email='refresh@example.com',
+            username='refresh@example.com',
             password=self.password,
             is_active=True,
             is_startup=True,
         )
         login_response = self.client.post(
-            reverse("auth-login"),
+            reverse('auth-login'),
             {
-                "email": self.user.email,
-                "password": self.password,
-                "role": "startup",
+                'email': self.user.email,
+                'password': self.password,
+                'role': 'startup',
             },
-            format="json",
+            format='json',
         )
         self.assertEqual(login_response.status_code, status.HTTP_200_OK)
-        self.refresh_token = login_response.data["refresh"]
-        self.refresh_url = reverse("token-refresh")
-        self.logout_url = reverse("auth-logout")
+        self.refresh_token = login_response.data['refresh']
+        self.refresh_url = reverse('token-refresh')
+        self.logout_url = reverse('auth-logout')
 
     def test_refresh_returns_new_access_token_for_valid_refresh(self):
         response = self.client.post(
             self.refresh_url,
-            {"refresh": self.refresh_token},
-            format="json",
+            {'refresh': self.refresh_token},
+            format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("access", response.data)
-        self.assertIsInstance(response.data["access"], str)
+        self.assertIn('access', response.data)
+        self.assertIsInstance(response.data['access'], str)
 
     def test_refresh_invalid_token_returns_401(self):
         response = self.client.post(
             self.refresh_url,
-            {"refresh": "not-a-valid-token"},
-            format="json",
+            {'refresh': 'not-a-valid-token'},
+            format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn("detail", response.data)
+        self.assertIn('detail', response.data)
 
     def test_logout_revokes_refresh_and_future_refresh_fails(self):
         logout_response = self.client.post(
             self.logout_url,
-            {"refresh": self.refresh_token},
-            format="json",
+            {'refresh': self.refresh_token},
+            format='json',
         )
         refresh_response = self.client.post(
             self.refresh_url,
-            {"refresh": self.refresh_token},
-            format="json",
+            {'refresh': self.refresh_token},
+            format='json',
         )
 
         self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn("detail", refresh_response.data)
+        self.assertIn('detail', refresh_response.data)
 
     def test_logout_requires_refresh_token(self):
-        response = self.client.post(self.logout_url, {}, format="json")
+        response = self.client.post(self.logout_url, {}, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("refresh", response.data)
+        self.assertIn('refresh', response.data)
 
     def test_logout_invalid_refresh_returns_400(self):
         response = self.client.post(
             self.logout_url,
-            {"refresh": "invalid-token"},
-            format="json",
+            {'refresh': 'invalid-token'},
+            format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("detail", response.data)
+        self.assertIn('detail', response.data)
