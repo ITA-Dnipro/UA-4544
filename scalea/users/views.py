@@ -182,9 +182,17 @@ class VerifyEmailView(APIView):
                     {'detail': 'Invalid or expired token.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            user = User.objects.filter(
-                id=payload['user_id'], email=payload['email']
-            ).first()
+
+            user_id = payload.get('user_id')
+            email = payload.get('email')
+
+            if not user_id or not email:
+                return Response(
+                    {'detail': 'Invalid or expired token.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user = User.objects.filter(id=user_id, email=email).first()
             if user is None:
                 return Response(
                     {'detail': 'Invalid or expired token.'},
