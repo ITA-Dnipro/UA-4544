@@ -27,6 +27,8 @@ const PasswordResetRequest: React.FC = () => {
         body: JSON.stringify({ email: data.email }),
       });
     } catch {
+      // Catching error to ensure the UI always shows the success message.
+      // This prevents email enumeration and satisfies the 'no-empty' lint rule
     } finally {
       setIsSent(true);
     }
