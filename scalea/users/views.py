@@ -35,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 
 class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
+
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -74,6 +78,10 @@ class PasswordResetRequestView(APIView):
 
 
 class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
+
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -98,7 +106,6 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
-            # Keep password update and session invalidation in one transaction.
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
