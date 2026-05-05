@@ -4,6 +4,8 @@ from django.core import exceptions
 from django.db import transaction
 from investors.models import InvestorProfile
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 from startups.models import StartupProfile
 
 User = get_user_model()
@@ -28,13 +30,13 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
-    role = serializers.ChoiceField(choices=['startup', 'investor'])
-    company_name = serializers.CharField(required=False, allow_blank=True, default='')
-    short_pitch = serializers.CharField(required=False, allow_blank=True, default='')
-    website = serializers.URLField(required=False, allow_blank=True, default='')
-    bio = serializers.CharField(required=False, allow_blank=True, default='')
+    role = serializers.ChoiceField(choices=["startup", "investor"])
+    company_name = serializers.CharField(required=False, allow_blank=True, default="")
+    short_pitch = serializers.CharField(required=False, allow_blank=True, default="")
+    website = serializers.URLField(required=False, allow_blank=True, default="")
+    bio = serializers.CharField(required=False, allow_blank=True, default="")
     investment_focus = serializers.CharField(
-        required=False, allow_blank=True, default=''
+        required=False, allow_blank=True, default=""
     )
 
     def validate_email(self, value):
@@ -50,9 +52,9 @@ class RegisterSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        role = validated_data.pop('role')
-        password = validated_data.pop('password')
-        email = validated_data.pop('email')
+        role = validated_data.pop("role")
+        password = validated_data.pop("password")
+        email = validated_data.pop("email")
 
         user = User.objects.filter(email=email).first()
 
@@ -65,23 +67,23 @@ class RegisterSerializer(serializers.Serializer):
             email=email,
             password=password,
             is_active=False,
-            is_startup=(role == 'startup'),
-            is_investor=(role == 'investor'),
+            is_startup=(role == "startup"),
+            is_investor=(role == "investor"),
         )
 
-        if role == 'startup':
+        if role == "startup":
             StartupProfile.objects.create(
                 user=user,
-                company_name=validated_data.get('company_name', ''),
-                description=validated_data.get('short_pitch', ''),
-                website=validated_data.get('website', ''),
+                company_name=validated_data.get("company_name", ""),
+                description=validated_data.get("short_pitch", ""),
+                website=validated_data.get("website", ""),
             )
         else:
             InvestorProfile.objects.create(
                 user=user,
-                company_name=validated_data.get('company_name', ''),
-                bio=validated_data.get('bio', ''),
-                investment_focus=validated_data.get('investment_focus', ''),
+                company_name=validated_data.get("company_name", ""),
+                bio=validated_data.get("bio", ""),
+                investment_focus=validated_data.get("investment_focus", ""),
             )
 
         self.send_verification_email(user)
@@ -105,34 +107,50 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     remember = serializers.BooleanField(required=False, default=False)
-    role = serializers.ChoiceField(choices=['startup', 'investor'], required=True)
+    role = serializers.ChoiceField(choices=["startup", "investor"], required=True)
 
     def validate(self, attrs):
-        email = attrs['email'].strip().lower()
-        password = attrs['password']
-        requested_role = attrs['role']
+        email = attrs["email"].strip().lower()
+        password = attrs["password"]
+        requested_role = attrs["role"]
 
         user = User.objects.filter(email=email).first()
 
         if not user or not user.check_password(password) or not user.is_active:
             raise serializers.ValidationError(
-                {'detail': 'Invalid email or password.'},
-                code='authorization',
+                {"detail": "Invalid email or password."},
+                code="authorization",
             )
 
-        if requested_role == 'startup' and not user.is_startup:
+        if requested_role == "startup" and not user.is_startup:
             raise serializers.ValidationError(
-                {'detail': 'Invalid email or password.'},
-                code='authorization',
+                {"detail": "Invalid email or password."},
+                code="authorization",
             )
 
-        if requested_role == 'investor' and not user.is_investor:
+        if requested_role == "investor" and not user.is_investor:
             raise serializers.ValidationError(
-                {'detail': 'Invalid email or password.'},
-                code='authorization',
+                {"detail": "Invalid email or password."},
+                code="authorization",
             )
 
-        attrs['user'] = user
-        attrs['email'] = email
-        attrs['role'] = requested_role
+        attrs["user"] = user
+        attrs["email"] = email
+        attrs["role"] = requested_role
         return attrs
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        try:
+            attrs["token_obj"] = RefreshToken(attrs["refresh"])
+        except TokenError as exc:
+            raise serializers.ValidationError(
+                {"detail": "Invalid or expired token."}
+            ) from exc
+        return attrs
+
+    def save(self, **kwargs):
+        self.validated_data["token_obj"].blacklist()
