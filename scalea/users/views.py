@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -9,15 +10,18 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.serializers import (
+from .security import clear_failures, is_locked, register_failure
+from .serializers import (
+    LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    RegisterSerializer,
 )
-from users.tokens import password_reset_token
-
-from .serializers import RegisterSerializer
+from .tokens import password_reset_token
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -108,4 +112,54 @@ class RegisterView(generics.CreateAPIView):
                 'detail': 'Verification email sent. Please check your inbox.',
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
+
+    def post(self, request):
+        raw_email = request.data.get('email')
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else ''
+
+        if email and is_locked(email):
+            return Response(
+                {'detail': ['Too many failed attempts. Try again later.']},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = LoginSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            if 'detail' in serializer.errors:
+                if email:
+                    register_failure(email)
+                return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.validated_data['user']
+        remember = serializer.validated_data['remember']
+
+        clear_failures(email)
+
+        refresh = RefreshToken.for_user(user)
+        access = refresh.access_token
+        if remember:
+            refresh.set_exp(lifetime=timedelta(days=30))
+            access.set_exp(lifetime=timedelta(hours=12))
+
+        role = serializer.validated_data['role']
+
+        return Response(
+            {
+                'access': str(access),
+                'refresh': str(refresh),
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'role': role,
+                },
+            },
+            status=status.HTTP_200_OK,
         )
