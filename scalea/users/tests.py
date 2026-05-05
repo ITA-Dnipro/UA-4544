@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from startups.models import StartupProfile
 
-from users.models import User
+from users.models import PasswordResetAudit, User
 from users.tokens import password_reset_token
 
 
@@ -113,9 +113,11 @@ class RegistrationAPITests(TestCase):
 
 class PasswordResetRequestViewTest(APITestCase):
     def setUp(self):
+        cache.clear()
+        self.email = 'test@gmail.com'
         self.user = User.objects.create_user(
             username='testuser',
-            email='test@gmail.com',
+            email=self.email,
             password='OldP@ssword1',
         )
         self.url = '/api/auth/password-reset/'
@@ -132,6 +134,33 @@ class PasswordResetRequestViewTest(APITestCase):
     def test_invalid_email_returns_400(self):
         response = self.client.post(self.url, {'email': 'notanemail'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch(
+        'rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True
+    )
+    def test_per_email_throttle_triggers(self, _mock_throttle):
+        from users.security import PASSWORD_RESET_MAX_ATTEMPTS
+
+        for _ in range(PASSWORD_RESET_MAX_ATTEMPTS):
+            self.client.post(self.url, {'email': self.email})
+
+        response = self.client.post(self.url, {'email': self.email})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('email', response.data['detail'])
+
+    @patch(
+        'rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True
+    )
+    def test_unknown_email_also_throttled_per_email(self, _mock_throttle):
+        from users.security import PASSWORD_RESET_MAX_ATTEMPTS
+
+        unknown = 'ghost@example.com'
+        for _ in range(PASSWORD_RESET_MAX_ATTEMPTS):
+            self.client.post(self.url, {'email': unknown})
+
+        response = self.client.post(self.url, {'email': unknown})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('email', response.data['detail'])
 
 
 class PasswordResetConfirmViewTest(APITestCase):
@@ -338,3 +367,31 @@ class TestLoginApi(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('role', res.data)
+
+
+class PasswordResetRequestTests(APITestCase):
+    def setUp(self):
+        self.url = '/api/auth/password-reset/'
+        self.email = 'test@example.com'
+        self.user = User.objects.create_user(
+            username=self.email, email=self.email, password='Password123!'
+        )
+
+    def test_request_returns_200_for_any_email(self):
+        response = self.client.post(self.url, {'email': self.email})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.post(self.url, {'email': 'unknown@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_audit_log_created(self):
+        initial_count = PasswordResetAudit.objects.count()
+        self.client.post(self.url, {'email': self.email})
+        self.assertEqual(PasswordResetAudit.objects.count(), initial_count + 1)
+
+    def test_throttling_applies(self):
+        for _ in range(5):
+            self.client.post(self.url, {'email': self.email})
+
+        response = self.client.post(self.url, {'email': self.email})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
