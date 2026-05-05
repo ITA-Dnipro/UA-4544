@@ -18,7 +18,7 @@ def _make_user(username, email, **kwargs):
         'is_verified': True,
     }
     defaults.update(kwargs)
-    return User.objects.crte_user(username=username, email=email, **defaults)
+    return User.objects.create_user(username=username, email=email, **defaults)
 
 
 def _make_startup(user, **kwargs):
