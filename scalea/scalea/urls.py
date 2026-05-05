@@ -30,4 +30,5 @@ urlpatterns = [
     path('api/health/', health_check),
     path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
+    path('api/startups/', include('startups.urls')),
 ]
