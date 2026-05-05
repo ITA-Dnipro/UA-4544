@@ -6,6 +6,7 @@ from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import transaction
 
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
@@ -61,10 +62,27 @@ class PublishProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        profile.is_published = True
-        profile.published_at = timezone.now()
-        profile.published_by = request.user
-        profile.save(update_fields=['is_published', 'published_at', 'published_by'])
+        if missing:
+            return Response(
+                {'missing_fields': missing},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            updated = StartupProfile.objects.filter(
+                pk=profile.pk,
+                is_published=False,
+            ).update(
+                is_published=True,
+                published_at=timezone.now(),
+                published_by=request.user,
+            )
+
+        if updated == 0:
+            return Response(
+                {'detail': 'Profile is already published.'},
+                status=status.HTTP_200_OK,
+            )
 
         return Response(
             {'detail': 'Profile published successfully.'},
