@@ -5,11 +5,12 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
-from startups.models import StartupProfile
+from rest_framework_simplejwt.tokens import RefreshToken
 
+from investors.models import InvestorProfile
+from startups.models import StartupProfile
 from users.models import User
 from users.tokens import password_reset_token
 
@@ -157,6 +158,25 @@ class PasswordResetConfirmViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewP@ssword1'))
+
+    def test_password_reset_revokes_existing_refresh_tokens(self):
+        refresh = str(RefreshToken.for_user(self.user))
+
+        reset_response = self.client.post(
+            self.url,
+            {
+                'token': self.combined_token,
+                'password': 'NewP@ssword1',
+            },
+        )
+        refresh_response = self.client.post(
+            '/api/auth/refresh/',
+            {'refresh': refresh},
+            format='json',
+        )
+
+        self.assertEqual(reset_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_invalid_token_returns_400(self):
         response = self.client.post(
@@ -338,3 +358,82 @@ class TestLoginApi(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('role', res.data)
+
+
+class RefreshAndLogoutApiTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.password = 'P@ssw0rd123'
+        self.user = User.objects.create_user(
+            email='refresh@example.com',
+            username='refresh@example.com',
+            password=self.password,
+            is_active=True,
+            is_startup=True,
+        )
+        login_response = self.client.post(
+            reverse('auth-login'),
+            {
+                'email': self.user.email,
+                'password': self.password,
+                'role': 'startup',
+            },
+            format='json',
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.refresh_token = login_response.data['refresh']
+        self.refresh_url = reverse('token-refresh')
+        self.logout_url = reverse('auth-logout')
+
+    def test_refresh_returns_new_access_token_for_valid_refresh(self):
+        response = self.client.post(
+            self.refresh_url,
+            {'refresh': self.refresh_token},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIsInstance(response.data['access'], str)
+
+    def test_refresh_invalid_token_returns_401(self):
+        response = self.client.post(
+            self.refresh_url,
+            {'refresh': 'not-a-valid-token'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('detail', response.data)
+
+    def test_logout_revokes_refresh_and_future_refresh_fails(self):
+        logout_response = self.client.post(
+            self.logout_url,
+            {'refresh': self.refresh_token},
+            format='json',
+        )
+        refresh_response = self.client.post(
+            self.refresh_url,
+            {'refresh': self.refresh_token},
+            format='json',
+        )
+
+        self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('detail', refresh_response.data)
+
+    def test_logout_requires_refresh_token(self):
+        response = self.client.post(self.logout_url, {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('refresh', response.data)
+
+    def test_logout_invalid_refresh_returns_400(self):
+        response = self.client.post(
+            self.logout_url,
+            {'refresh': 'invalid-token'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)

@@ -2,8 +2,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from django.db import transaction
-from investors.models import InvestorProfile
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from investors.models import InvestorProfile
 from startups.models import StartupProfile
 
 User = get_user_model()
@@ -136,3 +139,19 @@ class LoginSerializer(serializers.Serializer):
         attrs['email'] = email
         attrs['role'] = requested_role
         return attrs
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        try:
+            attrs['token_obj'] = RefreshToken(attrs['refresh'])
+        except TokenError as exc:
+            raise serializers.ValidationError(
+                {'detail': 'Invalid or expired token.'}
+            ) from exc
+        return attrs
+
+    def save(self):
+        self.validated_data['token_obj'].blacklist()

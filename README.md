@@ -143,13 +143,17 @@ The login endpoint (`POST /api/auth/login/`) authenticates a user using email, p
   - refresh token lifetime is extended to **30 days**
   - access token lifetime is extended to **12 hours**
 
-#### API Usage Example
+### Refresh & Logout
 
-```bash
-curl -X POST http://localhost:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "P@ssw0rd", "role": "startup", "remember": true}'
-```
+The backend supports:
+
+- `POST /api/auth/refresh/`
+- `POST /api/auth/logout/`
+
+Auth session management includes token refresh and refresh-token revocation on logout.
+After successful password reset confirmation, all active refresh tokens for the user are revoked (existing sessions are invalidated).
+
+Detailed request/response examples and security/session policies (TTL, throttling, token revocation, and password-reset session invalidation) are documented in the project wiki.
 
 ### Password Reset Flow
 

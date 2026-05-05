@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -12,11 +13,17 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .security import clear_failures, is_locked, register_failure
 from .serializers import (
     LoginSerializer,
+    LogoutSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
@@ -95,8 +102,13 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user.set_password(password)
-        user.save()
+        with transaction.atomic():
+            user.set_password(password)
+            user.save()
+
+            for outstanding in OutstandingToken.objects.filter(user=user):
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+
         logger.info('Password reset for user: %s', user.pk)
 
         return Response(
@@ -171,3 +183,22 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class RefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'refresh'
+
+
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'logout'
+
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
