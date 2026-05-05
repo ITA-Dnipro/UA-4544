@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from startups.models import StartupProfile
 
@@ -95,3 +97,70 @@ class SlugAutoGenerationTests(TestCase):
         self.assertIsNotNone(profile1.slug)
         self.assertIsNotNone(profile2.slug)
         self.assertNotEqual(profile1.slug, profile2.slug)
+
+
+class PublishProfilePermissionTests(APITestCase):
+    def setUp(self):
+        self.owner = _make_user('owner', 'owner@test.com')
+        self.profile = StartupProfile.objects.create(
+            user=self.owner,
+            company_name='Test Startup',
+            description='A great startup description.',
+            contact_email='contact@test.com',
+        )
+
+        self.stranger = _make_user('stranger', 'stranger@test.com')
+
+        self.admin = User.objects.create_user(
+            username='admin@test.com',
+            email='admin@test.com',
+            password='testpass123',
+            is_staff=True,
+        )
+
+        self.url = reverse('startup-publish', kwargs={'pk': self.profile.pk})
+
+    def test_anonymous_cannot_publish(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_stranger_cannot_publish(self):
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_publish(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_owner_incomplete_profile_returns_400(self):
+        self.profile.description = ''
+        self.profile.save()
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('missing_fields', response.data)
+        self.assertIn('description', response.data['missing_fields'])
+
+    def test_owner_complete_profile_publishes(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.is_published)
+        self.assertIsNotNone(self.profile.published_at)
+        self.assertEqual(self.profile.published_by, self.owner)
+
+    def test_publish_already_published_returns_200(self):
+        self.profile.is_published = True
+        self.profile.save()
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], 'Profile is already published.')
