@@ -15,6 +15,16 @@ class StartupProfile(models.Model):
     contact_phone = models.CharField(max_length=50, blank=True)
     tags = models.JSONField(default=list, blank=True)
     website = models.URLField(blank=True)
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='published_profiles',
+    )
+    draft_saved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

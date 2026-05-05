@@ -6,6 +6,8 @@ import Register from "../pages/Register";
 import StartupView from "../pages/StartupView";
 import InvestorDashboard from "../pages/InvestorDashboard";
 import Inbox from "../pages/Inbox";
+import PasswordResetConfirm from "../pages/PasswordReset/PasswordResetConfirm";
+import PasswordResetRequest from "../pages/PasswordReset/PasswordResetRequest";
 import Search from "../pages/Search";
 
 export default function AppRouter() {
@@ -20,6 +22,11 @@ export default function AppRouter() {
         <Route path="/search" element={<Search />} />
         <Route path="/dashboard" element={<InvestorDashboard />} />
         <Route path="/messages" element={<Inbox />} />
+        <Route path="/password-reset" element={<PasswordResetRequest />} />
+        <Route
+          path="/reset-password/:token"
+          element={<PasswordResetConfirm />}
+        />
       </Routes>
     </BrowserRouter>
   );
