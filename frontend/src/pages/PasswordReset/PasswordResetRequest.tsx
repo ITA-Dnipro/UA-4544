@@ -26,7 +26,7 @@ const PasswordResetRequest: React.FC = () => {
         },
         body: JSON.stringify({ email: data.email }),
       });
-    } catch (e) {
+    } catch {
     } finally {
       setIsSent(true);
     }

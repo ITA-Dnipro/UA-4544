@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { vi, describe, test, expect, beforeEach } from "vitest";
 import PasswordResetRequest from "./PasswordResetRequest";
