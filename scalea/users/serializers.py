@@ -2,9 +2,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from django.db import transaction
-from investors.models import InvestorProfile
+
 from rest_framework import serializers
+
+from investors.models import InvestorProfile
 from startups.models import StartupProfile
+from users.services import send_email_verification
+
 
 User = get_user_model()
 
@@ -88,17 +92,10 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
     def send_verification_email(self, user):
-        # TODO(i-taras): Implement actual SMTP dispatch & activation token logic [#99]
-        # Users will be LOCKED OUT until this method is implemented
-        # and the activation endpoint is ready.
-        # This is a placeholder to allow the registration schema to merge.
-        pass
+        send_email_verification(user)
 
-    def send_already_registered_email(self, user):
-        # TODO(i-taras): Implement resend logic for verification emails [#99]
-        # This is a placeholder to allow the registration schema to merge and
-        # NO email is actually dispatched.
-        pass
+    def send_already_registered_email(self, _user):
+        return
 
 
 class LoginSerializer(serializers.Serializer):
@@ -136,3 +133,15 @@ class LoginSerializer(serializers.Serializer):
         attrs['email'] = email
         attrs['role'] = requested_role
         return attrs
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True, allow_blank=False)
+
+
+class ResendVerificationEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(write_only=True)
+
+    def validate_email(self, value):
+        normalized_email = User.objects.normalize_email(value)
+        return normalized_email.lower()

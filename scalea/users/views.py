@@ -7,6 +7,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,12 +17,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .security import clear_failures, is_locked, register_failure
 from .serializers import (
+    EmailVerificationSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
+    ResendVerificationEmailSerializer,
 )
-from .tokens import password_reset_token
+from .services import send_email_verification
+from .throttles import ResendVerificationEmailThrottle
+from .tokens import decode_email_verification_token, password_reset_token
+
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -163,3 +169,73 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class VerifyEmailView(APIView):
+    def post(self, request):
+        serializer = EmailVerificationSerializer(data=request.data)
+        if serializer.is_valid():
+            token = serializer.validated_data['token']
+            payload = decode_email_verification_token(token)
+            if payload is None:
+                return Response(
+                    {'detail': 'Invalid or expired token.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user_id = payload.get('user_id')
+            email = payload.get('email')
+
+            if not user_id or not email:
+                return Response(
+                    {'detail': 'Invalid or expired token.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user = User.objects.filter(id=user_id, email=email).first()
+            if user is None:
+                return Response(
+                    {'detail': 'Invalid or expired token.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.is_verified = True
+            user.is_active = True
+            user.save(update_fields=['is_verified', 'is_active'])
+            return Response({'detail': 'Email verified successfully.'})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResendVerificationEmailView(APIView):
+    throttle_classes = [ResendVerificationEmailThrottle]
+
+    def post(self, request):
+        serializer = ResendVerificationEmailSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            user = User.objects.filter(email=email).first()
+            if user is None:
+                return Response(
+                    {
+                        'detail': 'If an account with that email exists, a verification email has been sent.'
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            if user.is_verified:
+                return Response(
+                    {
+                        'detail': 'If an account with that email exists, a verification email has been sent.'
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            try:
+                send_email_verification(user)
+            except Exception:
+                logger.exception('Failed to resend verification email')
+            return Response(
+                {
+                    'detail': 'If an account with that email exists, a verification email has been sent.'
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
