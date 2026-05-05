@@ -31,4 +31,5 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
+    path('api/profiles/', include('startups.publish_urls')),
 ]
