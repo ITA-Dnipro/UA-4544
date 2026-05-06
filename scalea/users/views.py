@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request):
-    """Отримує реальний IP клієнта, враховуючи X-Forwarded-For для проксі"""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         return x_forwarded_for.split(',')[0].strip()
@@ -51,7 +50,6 @@ def get_client_ip(request):
 
 
 def mask_email_for_log(email):
-    """Хешує email для безпечного відображення в логах (PII protection)"""
     return hashlib.sha256(email.encode()).hexdigest()[:10] + "..."
 
 
@@ -85,13 +83,13 @@ class PasswordResetRequestView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
             combined_token = f'{uid}.{token}'
-            # Використовуємо формат з query-параметром для стабільності фронтенду
             reset_url = f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
 
             html_message = render_to_string(
                 'email/password_reset.html',
                 {'reset_url': reset_url},
             )
+
             email_msg = EmailMultiAlternatives(
                 subject='Password Reset — Scalea',
                 body=f'Reset your password: {reset_url}',
@@ -99,7 +97,7 @@ class PasswordResetRequestView(APIView):
                 to=[user.email],
             )
             email_msg.attach_alternative(html_message, 'text/html')
-            
+
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
@@ -140,7 +138,6 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
-            # Анулювання всіх старих сесій користувача
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 

@@ -126,11 +126,9 @@ class PasswordResetRequestTests(APITestCase):
 
     @patch('users.views.EmailMultiAlternatives.send')
     def test_request_returns_200_for_any_email(self, _mock_send):
-        # Перевірка існуючого email
         response = self.client.post(self.url, {'email': self.email})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Перевірка неіснуючого email (безпека: не розкриваємо базу)
         response = self.client.post(self.url, {'email': "unknown@example.com"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -217,11 +215,12 @@ class PasswordResetConfirmViewTest(APITestCase):
 class TestLoginApi(APITestCase):
     def setUp(self):
         cache.clear()
+        self.email = 'user@example.com'
         self.password = 'P@ssw0rd123'
         self.role = 'startup'
         self.user = User.objects.create_user(
-            email='user@example.com',
-            username='user@example.com',
+            email=self.email,
+            username=self.email,
             password=self.password,
             is_active=True,
             is_startup=True,
@@ -233,7 +232,7 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': self.password,
                 'role': self.role,
             },
@@ -242,14 +241,14 @@ class TestLoginApi(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn('access', res.data)
         self.assertIn('refresh', res.data)
-        self.assertEqual(res.data['user']['email'], 'user@example.com')
+        self.assertEqual(res.data['user']['email'], self.email)
         self.assertEqual(res.data['user']['role'], 'startup')
 
     def test_wrong_password_returns_401_generic(self):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': 'wrongpass',
                 'role': self.role,
             },
@@ -266,7 +265,7 @@ class TestLoginApi(APITestCase):
             self.client.post(
                 self.url,
                 {
-                    'email': 'user@example.com',
+                    'email': self.email,
                     'password': 'wrong',
                     'role': self.role,
                 },
@@ -275,7 +274,7 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': 'wrong',
                 'role': self.role,
             },
@@ -292,7 +291,7 @@ class TestLoginApi(APITestCase):
             self.client.post(
                 self.url,
                 {
-                    'email': 'user@example.com',
+                    'email': self.email,
                     'password': 'wrong',
                     'role': self.role,
                 },
@@ -302,7 +301,7 @@ class TestLoginApi(APITestCase):
         ok = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': self.password,
                 'role': self.role,
             },
@@ -313,7 +312,7 @@ class TestLoginApi(APITestCase):
         post_login_failure = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': 'wrong',
                 'role': self.role,
             },
@@ -329,7 +328,7 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': self.password,
                 'role': self.role,
                 'remember': True,
@@ -346,7 +345,7 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': self.password,
                 'role': 'investor',
             },
@@ -362,7 +361,7 @@ class TestLoginApi(APITestCase):
         res = self.client.post(
             self.url,
             {
-                'email': 'user@example.com',
+                'email': self.email,
                 'password': self.password,
             },
             format='json',
