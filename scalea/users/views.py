@@ -21,7 +21,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import PasswordResetAudit
-from .security import clear_failures, is_locked, register_failure
+from .security import (
+    clear_failures, 
+    is_locked, 
+    register_failure,
+    is_password_reset_locked,
+    register_password_reset_request
+)
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
@@ -45,9 +51,17 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
+
+        if is_password_reset_locked(email):
+            return Response(
+                {'detail': 'Too many password reset requests for this email. Try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        register_password_reset_request(email)
         user = User.objects.filter(email=email).first()
 
-        # Audit the attempt regardless of user existence to prevent enumeration
+
         PasswordResetAudit.objects.create(
             user=user,
             email=email,
@@ -58,7 +72,6 @@ class PasswordResetRequestView(APIView):
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
-            # Using the combined token format for cleaner URLs
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
@@ -80,7 +93,7 @@ class PasswordResetRequestView(APIView):
                 logger.exception('Failed to send password reset email to %s', email)
 
         return Response(
-            {'detail': 'If this email exists, you will receive a reset link.'},
+            {'detail': 'If this email exists, you will receive reset instructions.'},
             status=status.HTTP_200_OK,
         )
 
@@ -98,11 +111,10 @@ class PasswordResetConfirmView(APIView):
         password = serializer.validated_data['password']
 
         try:
-            # Supports the 'uid.token' format
-            uid, token = raw_token.split('.', 1)
-            decoded_uid = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.filter(id=decoded_uid).first()
-        except (ValueError, TypeError):
+            uid_b64, token = raw_token.split('.', 1)
+            uid = force_str(urlsafe_base64_decode(uid_b64))
+            user = User.objects.filter(id=uid).first()
+        except (ValueError, TypeError, Exception):
             user = None
 
         if not user or not password_reset_token.check_token(user, token):
@@ -115,7 +127,7 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
-            # Security: Invalidate all existing sessions/tokens after password change
+
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 

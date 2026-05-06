@@ -72,7 +72,7 @@ ROOT_URLCONF = 'scalea.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -176,6 +176,9 @@ REST_FRAMEWORK = {
         'refresh': '10/minute',
         'logout': '10/minute',
         'password_reset': '5/hour',
+        'login': '10/hour',
+        'refresh': '10/minute',
+        'logout': '10/minute',
     },
 }
 

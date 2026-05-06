@@ -472,4 +472,3 @@ class PasswordResetRequestTests(APITestCase):
   
         response = self.client.post(self.url, {'email': self.email})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
-
