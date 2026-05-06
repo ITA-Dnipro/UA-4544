@@ -5,11 +5,10 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from investors.models import InvestorProfile
 from startups.models import StartupProfile
 
 from users.models import PasswordResetAudit, User
@@ -471,6 +470,7 @@ class RefreshAndLogoutApiTests(APITestCase):
 
 class PasswordResetRequestTests(APITestCase):
     def setUp(self):
+        cache.clear()  # <-- add this
         self.url = '/api/auth/password-reset/'
         self.email = 'test@example.com'
         self.user = User.objects.create_user(
