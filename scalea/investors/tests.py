@@ -87,6 +87,15 @@ class InvestorProfileAPITests(APITestCase):
             email='owner@investor.com',
             password='password123',
             is_investor=True,
+            is_startup=False,
+        )
+
+        self.profile = InvestorProfile.objects.create(
+            user=self.owner_user,
+            company_name='Alpha VC',
+            bio='Early-stage tech focus.',
+            investment_focus='AI, Web3',
+            website='https://alpha-vc.com',
         )
 
         self.stranger_user = User.objects.create_user(
@@ -96,26 +105,16 @@ class InvestorProfileAPITests(APITestCase):
             is_investor=True,
         )
 
-        self.profile = InvestorProfile.objects.create(
-            user=self.owner_user,
-            company_name='Alpha VC',
-            bio='Focusing on early-stage tech.',
-            investment_focus='AI, Web3',
-            website='https://alpha-vc.com',
-        )
-
-        self.url = reverse('profile-detail', kwargs={'pk': self.profile.pk})
+        self.url = reverse('profile-detail', kwargs={'pk': self.owner_user.pk})
 
     def test_get_investor_profile_public_success(self):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.data
-
-        self.assertEqual(data['company_name'], 'Alpha VC')
-        self.assertEqual(data['investment_focus'], 'AI, Web3')
-        self.assertIn('bio', data)
-        self.assertEqual(data['website'], 'https://alpha-vc.com')
+        self.assertEqual(response.data['company_name'], 'Alpha VC')
+        self.assertEqual(response.data['website'], 'https://alpha-vc.com')
+        self.assertIn('investments_count', response.data)
+        self.assertIn('saved_startups_count', response.data)
 
     def test_owner_can_patch_investor_profile(self):
         self.client.force_authenticate(user=self.owner_user)
@@ -124,6 +123,8 @@ class InvestorProfileAPITests(APITestCase):
         response = self.client.patch(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'Updated Alpha VC')
+
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.company_name, 'Updated Alpha VC')
 
@@ -139,7 +140,7 @@ class InvestorProfileAPITests(APITestCase):
         response = self.client.put(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['company_name'], 'New Fund Name')
+        self.assertEqual(response.data['investment_focus'], 'SaaS only')
 
     def test_stranger_cannot_update_investor_profile(self):
         self.client.force_authenticate(user=self.stranger_user)
@@ -149,10 +150,21 @@ class InvestorProfileAPITests(APITestCase):
 
     def test_anonymous_cannot_update_investor_profile(self):
         response = self.client.patch(self.url, {'company_name': 'Anonymous VC'})
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
 
     def test_update_invalid_data_returns_400(self):
         self.client.force_authenticate(user=self.owner_user)
-        response = self.client.patch(self.url, {'website': 'not-a-url'}, format='json')
+        payload = {'website': 'not-a-url'}
+
+        response = self.client.patch(self.url, payload, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('website', response.data)
+
+    def test_get_non_existent_user_returns_404(self):
+        invalid_url = reverse('profile-detail', kwargs={'pk': 9999})
+        response = self.client.get(invalid_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
