@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -32,7 +32,7 @@ class StartupListView(generics.ListAPIView):
         )
         tag = self.request.query_params.get('tag')
         if tag:
-            queryset = queryset.filter(tags__icontains=tag)
+            queryset = queryset.filter(tags__contains=[tag.strip().lower()])
         return queryset
 
 
@@ -41,10 +41,22 @@ class StartupPublicProfileView(generics.RetrieveUpdateAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return StartupProfile.objects.annotate(
+        qs = StartupProfile.objects.annotate(
             followers_count=Count('savedstartup', distinct=True),
             projects_count=Count('projects', distinct=True),
         )
+
+        user = self.request.user
+
+        if self.request.method in ['PUT', 'PATCH']:
+            return qs
+
+        if user.is_authenticated:
+            if user.is_staff or user.is_superuser:
+                return qs
+            return qs.filter(Q(is_published=True) | Q(user=user))
+
+        return qs.filter(is_published=True)
 
     def get_permissions(self):
         if self.request.method in ['PUT', 'PATCH']:

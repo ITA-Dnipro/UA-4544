@@ -207,6 +207,8 @@ class LogoutView(APIView):
 
 
 class UniversalProfileDetailView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request, *args, **kwargs):
         response = StartupPublicProfileView.as_view()(request._request, *args, **kwargs)
 

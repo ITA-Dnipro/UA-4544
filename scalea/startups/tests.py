@@ -31,6 +31,14 @@ def _make_startup(user, **kwargs):
     return StartupProfile.objects.create(user=user, **defaults)
 
 
+def _make_published_startup(user, **kwargs):
+    return _make_startup(user, is_published=True, **kwargs)
+
+
+def _make_draft_startup(user, **kwargs):
+    return _make_startup(user, is_published=False, **kwargs)
+
+
 def _make_project(startup, **kwargs):
     defaults = {
         'title': 'Test Project',
@@ -57,7 +65,7 @@ class StartupProfileModelTests(TestCase):
 class StartupPublicProfileAPITests(TestCase):
     def setUp(self):
         self.user = _make_user('apiuser', 'api@example.com')
-        self.startup = _make_startup(
+        self.startup = _make_published_startup(
             self.user,
             company_name='Handmade Co',
             slug='handmade-co',
@@ -318,7 +326,7 @@ class StartupProfileUpdateTests(APITestCase):
     def setUp(self):
         self.owner = _make_user('owner_update', 'owner_upd@test.com')
         self.stranger = _make_user('stranger_update', 'stranger_upd@test.com')
-        self.profile = _make_startup(self.owner, company_name='Original Name')
+        self.profile = _make_published_startup(self.owner, company_name='Original Name')
 
         self.url = reverse('profile-detail', kwargs={'pk': self.profile.pk})
 
@@ -387,3 +395,13 @@ class StartupProfileUpdateTests(APITestCase):
         self.assertIn('about_html', response.data)
         self.assertIn('followers_count', response.data)
         self.assertIn('<p>New info</p>', response.data['about_html'])
+
+    def test_draft_profile_not_visible_to_anonymous(self):
+        draft_owner = _make_user('draft_owner', 'draft@test.com')
+
+        draft = _make_draft_startup(draft_owner, company_name='Hidden Startup')
+
+        url = reverse('profile-detail', kwargs={'pk': draft.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
