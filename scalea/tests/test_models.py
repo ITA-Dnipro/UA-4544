@@ -1,8 +1,8 @@
-import pytest
 from decimal import Decimal
+
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-
 from investors.models import Investment, InvestorProfile
 from projects.models import Project, ProjectStatus
 from startups.models import StartupProfile
@@ -58,7 +58,6 @@ class TestModels:
             raised_amount=Decimal('0.00')
         )
         assert project.title == "AI Engine"
-        # Перевірка через БД, щоб уникнути помилок при зверненні до об'єкта
         assert Project.objects.filter(id=project.id).exists()
 
     def test_investment_flow(self):
@@ -67,10 +66,10 @@ class TestModels:
 
         owner = User.objects.create_user(email="f@s.com", username="startup_f", is_startup=True)
         startup = StartupProfile.objects.create(user=owner, company_name="Target")
-        
+
         project = Project.objects.create(
-            startup=startup, 
-            title="App", 
+            startup=startup,
+            title="App",
             status=ProjectStatus.FUNDRAISING,
             short_description="S desc",
             description="L desc",
@@ -83,7 +82,7 @@ class TestModels:
             project=project,
             amount=Decimal('1000.00')
         )
-        
+
         assert investment.amount == Decimal('1000.00')
         assert inv_user.is_investor is True
         assert Investment.objects.filter(id=investment.id).exists()
