@@ -39,6 +39,7 @@ jobs:
           cd scalea
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          cd ..
           pip install -e .
 
       - name: Run Pytest with Coverage
