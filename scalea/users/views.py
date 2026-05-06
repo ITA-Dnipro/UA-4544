@@ -83,7 +83,9 @@ class PasswordResetRequestView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
 
             combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
+            reset_url = (
+                f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
+            )
 
             html_message = render_to_string(
                 'email/password_reset.html',

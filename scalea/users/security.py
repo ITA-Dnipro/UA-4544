@@ -14,7 +14,6 @@ def _normalize_email(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode('utf-8')).hexdigest()
 
 
-
 def _fail_key(email: str) -> str:
     return f'auth:login:count:{_normalize_email(email)}'
 
@@ -29,7 +28,6 @@ def _pr_count_key(email: str) -> str:
 
 def _pr_lock_key(email: str) -> str:
     return f'auth:password_reset:lock:{_normalize_email(email)}'
-
 
 
 def is_locked(email: str) -> bool:
@@ -51,7 +49,6 @@ def register_failure(email: str) -> None:
 def clear_failures(email: str) -> None:
     cache.delete(_fail_key(email))
     cache.delete(_lock_key(email))
-
 
 
 def is_password_reset_locked(email: str) -> bool:

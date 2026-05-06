@@ -18,6 +18,7 @@ from .models import PasswordResetAudit
 
 User = get_user_model()
 
+
 class UserModelTests(TestCase):
     def test_user_creation_with_role_flags(self):
         user = User.objects.create_user(
@@ -121,9 +122,7 @@ class PasswordResetRequestTests(APITestCase):
         self.url = '/api/auth/password-reset/'
         self.email = 'test@example.com'
         self.user = User.objects.create_user(
-            username=self.email,
-            email=self.email,
-            password='Password123!'
+            username=self.email, email=self.email, password='Password123!'
         )
 
     @patch('users.views.EmailMultiAlternatives.send')
@@ -131,7 +130,7 @@ class PasswordResetRequestTests(APITestCase):
         response = self.client.post(self.url, {'email': self.email})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        response = self.client.post(self.url, {'email': "unknown@example.com"})
+        response = self.client.post(self.url, {'email': 'unknown@example.com'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_invalid_email_returns_400(self):
