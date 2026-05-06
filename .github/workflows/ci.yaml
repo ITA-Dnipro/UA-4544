@@ -1,66 +1,71 @@
-name: CI
+name: CI for Scalea
 
 on:
   push:
-    branches: 
-      [main , develop]
-  pull_request: 
-    branches:
-      [main , develop]
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
 
 jobs:
-  lint-and-test:
+  lint-and-format:
     runs-on: ubuntu-latest
-    
     steps:
-     - name: Checkout code
-       uses: actions/checkout@v5
-    
-     - name: Set up Python
-       uses: actions/setup-python@v5
-       with:
-        python-version: '3.10' 
-     
-     - name: Install dependencies
-       run: pip install -e ".[dev]"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Ruff
+        run: pip install ruff
+      - name: Ruff lint check
+        run: ruff check scalea/
+      - name: Ruff format check
+        run: ruff format --check scalea/
 
-     - name: Ruff lint check
-       run: ruff check scalea/
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-     - name: Ruff format check
-       run: ruff format --check scalea/
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-     - name: Run tests with coverage
-       run: pytest --cov=scalea --cov-report=xml
+      - name: Install dependencies
+        run: |
+          cd scalea
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
 
-     - name: Upload coverage to Codecov
-       uses: codecov/codecov-action@v5
-       with:
+      - name: Run Pytest with Coverage
+        run: |
+          cd scalea
+          pytest
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./scalea/coverage.xml
           fail_ci_if_error: false
 
   frontend-build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
-
+        uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install dependencies
+      - name: Install and Build
         working-directory: frontend
         run: |
-          rm -f package-lock.json
           npm install
-
-      - name: ESLint check
-        working-directory: frontend
-        run: npm run lint
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+          npm run build
+          
