@@ -9,6 +9,7 @@ from startups.models import StartupProfile
 
 User = get_user_model()
 
+
 @pytest.fixture(autouse=True)
 def manage_cache():
     """Запобігає помилці 429 (Too Many Requests), очищуючи ліміти запитів"""
@@ -16,71 +17,74 @@ def manage_cache():
     yield
     cache.clear()
 
+
 @pytest.mark.django_db
 @pytest.mark.models
 class TestModels:
     def test_user_creation(self):
         user = User.objects.create_user(
-            email="test@scalea.com",
-            username="testuser",
-            password="password123",
-            is_verified=True
+            email='test@scalea.com',
+            username='testuser',
+            password='password123',
+            is_verified=True,
         )
-        assert user.email == "test@scalea.com"
+        assert user.email == 'test@scalea.com'
         assert user.is_verified is True
 
     def test_startup_profile_creation(self):
         owner = User.objects.create_user(
-            email="founder@scalea.com",
-            username="founder",
-            password="password123",
-            is_startup=True
+            email='founder@scalea.com',
+            username='founder',
+            password='password123',
+            is_startup=True,
         )
         startup = StartupProfile.objects.create(
-            user=owner,
-            company_name="Scalea Innovation",
-            description="Testing coverage"
+            user=owner, company_name='Scalea Innovation', description='Testing coverage'
         )
-        assert startup.company_name == "Scalea Innovation"
+        assert startup.company_name == 'Scalea Innovation'
         assert owner.is_startup is True
 
     def test_project_creation(self):
-        owner = User.objects.create_user(email="p@s.com", username="p_owner", is_startup=True)
-        startup = StartupProfile.objects.create(user=owner, company_name="Project Base")
+        owner = User.objects.create_user(
+            email='p@s.com', username='p_owner', is_startup=True
+        )
+        startup = StartupProfile.objects.create(user=owner, company_name='Project Base')
 
         project = Project.objects.create(
             startup=startup,
-            title="AI Engine",
+            title='AI Engine',
             status=ProjectStatus.IDEA,
-            short_description="Short desc",
-            description="Full desc",
+            short_description='Short desc',
+            description='Full desc',
             target_amount=Decimal('5000.00'),
-            raised_amount=Decimal('0.00')
+            raised_amount=Decimal('0.00'),
         )
-        assert project.title == "AI Engine"
+        assert project.title == 'AI Engine'
         assert Project.objects.filter(id=project.id).exists()
 
     def test_investment_flow(self):
-        inv_user = User.objects.create_user(email="i@s.com", username="investor_u", is_investor=True)
-        investor = InvestorProfile.objects.create(user=inv_user, company_name="VC Fund")
+        inv_user = User.objects.create_user(
+            email='i@s.com', username='investor_u', is_investor=True
+        )
+        investor = InvestorProfile.objects.create(user=inv_user, company_name='VC Fund')
 
-        owner = User.objects.create_user(email="f@s.com", username="startup_f", is_startup=True)
-        startup = StartupProfile.objects.create(user=owner, company_name="Target")
+        owner = User.objects.create_user(
+            email='f@s.com', username='startup_f', is_startup=True
+        )
+        startup = StartupProfile.objects.create(user=owner, company_name='Target')
 
         project = Project.objects.create(
             startup=startup,
-            title="App",
+            title='App',
             status=ProjectStatus.FUNDRAISING,
-            short_description="S desc",
-            description="L desc",
+            short_description='S desc',
+            description='L desc',
             target_amount=Decimal('10000.00'),
-            raised_amount=Decimal('0.00')
+            raised_amount=Decimal('0.00'),
         )
 
         investment = Investment.objects.create(
-            investor_profile=investor,
-            project=project,
-            amount=Decimal('1000.00')
+            investor_profile=investor, project=project, amount=Decimal('1000.00')
         )
 
         assert investment.amount == Decimal('1000.00')
