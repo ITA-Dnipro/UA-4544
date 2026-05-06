@@ -21,7 +21,7 @@ class User(AbstractUser):
 class PasswordResetAudit(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,  
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='password_reset_audits'
@@ -37,4 +37,3 @@ class PasswordResetAudit(models.Model):
 
     def __str__(self):
         return f'Reset requested for {self.email} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
-    

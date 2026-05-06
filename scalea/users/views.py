@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from datetime import timedelta
 
@@ -41,6 +42,19 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def get_client_ip(request):
+    """Отримує реальний IP клієнта, враховуючи X-Forwarded-For для проксі"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def mask_email_for_log(email):
+    """Хешує email для безпечного відображення в логах (PII protection)"""
+    return hashlib.sha256(email.encode()).hexdigest()[:10] + "..."
+
+
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -51,7 +65,6 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-
         if is_password_reset_locked(email):
             return Response(
                 {'detail': 'Too many password reset requests for this email. Try again later.'},
@@ -61,11 +74,10 @@ class PasswordResetRequestView(APIView):
         register_password_reset_request(email)
         user = User.objects.filter(email=email).first()
 
-
         PasswordResetAudit.objects.create(
             user=user,
             email=email,
-            ip_address=request.META.get('REMOTE_ADDR')
+            ip_address=get_client_ip(request)
         )
 
         if user:
@@ -73,7 +85,8 @@ class PasswordResetRequestView(APIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             
             combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
+            # Використовуємо формат з query-параметром для стабільності фронтенду
+            reset_url = f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
 
             html_message = render_to_string(
                 'email/password_reset.html',
@@ -90,10 +103,10 @@ class PasswordResetRequestView(APIView):
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email to %s', email)
+                logger.exception('Failed to send password reset email to %s', mask_email_for_log(email))
 
         return Response(
-            {'detail': 'If this email exists, you will receive reset instructions.'},
+            {'detail': 'If the email exists, you will receive reset instructions.'},
             status=status.HTTP_200_OK,
         )
 
@@ -127,11 +140,11 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
-
+            # Анулювання всіх старих сесій користувача
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
-        logger.info('Password reset successful for user: %s', user.pk)
+        logger.info('Password reset successful for user ID: %s', user.pk)
 
         return Response(
             {'detail': 'Password changed successfully'},
@@ -174,9 +187,11 @@ class LoginView(APIView):
 
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            if email:
-                register_failure(email)
-            return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            if 'detail' in serializer.errors or email:
+                if email:
+                    register_failure(email)
+                return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.validated_data['user']
         remember = serializer.validated_data['remember']
