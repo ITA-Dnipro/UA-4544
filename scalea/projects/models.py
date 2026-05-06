@@ -15,6 +15,18 @@ class ProjectStatus(models.TextChoices):
     CLOSED = 'closed', 'Closed'
 
 
+PROJECT_ACTIVE_STATUSES = [
+    ProjectStatus.IDEA,
+    ProjectStatus.MVP,
+    ProjectStatus.FUNDRAISING,
+]
+
+PROJECT_INACTIVE_STATUSES = [
+    ProjectStatus.FUNDED,
+    ProjectStatus.CLOSED,
+]
+
+
 class ProjectVisibility(models.TextChoices):
     PUBLIC = 'public', 'Public'
     PRIVATE = 'private', 'Private'
@@ -74,15 +86,15 @@ class Project(models.Model):
             while True:
                 try:
                     with transaction.atomic():
-                        if (
-                            not type(self)
-                            .objects.filter(slug=self.slug)
-                            .exclude(pk=self.pk)
-                            .exists()
-                        ):
-                            raise
                         return super().save(*args, **kwargs)
                 except IntegrityError:
+                    if (
+                        not type(self)
+                        .objects.filter(slug=self.slug)
+                        .exclude(pk=self.pk)
+                        .exists()
+                    ):
+                        raise
                     self.slug = f'{base}-{n}'
                     n += 1
         return super().save(*args, **kwargs)
