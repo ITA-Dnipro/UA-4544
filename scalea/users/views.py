@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import Count
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
@@ -17,7 +18,7 @@ from investors.serializers import (
 )
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -219,22 +220,37 @@ class LogoutView(APIView):
 
 
 class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsProfileOwnerOrAdmin]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [AllowAny()]
+        return [IsProfileOwnerOrAdmin()]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
         user = get_object_or_404(User, pk=pk)
 
         if user.is_startup:
-            obj = StartupProfile.objects.annotate(
+            queryset = StartupProfile.objects.annotate(
                 followers_count=Count('savedstartup', distinct=True),
                 projects_count=Count('projects', distinct=True),
-            ).get(user=user)
+            )
+            obj = get_object_or_404(queryset, user=user)
+
+            if not obj.is_published:
+                user_auth = self.request.user
+                is_owner = user_auth.is_authenticated and user_auth == obj.user
+                is_admin = user_auth.is_authenticated and (
+                    user_auth.is_staff or user_auth.is_superuser
+                )
+
+                if not (is_owner or is_admin):
+                    raise Http404('No StartupProfile matches the given query.')
         else:
             obj = get_object_or_404(InvestorProfile, user=user)
-        self.check_object_permissions(self.request, obj)
 
+        self.check_object_permissions(self.request, obj)
         return obj
 
     def get_serializer_class(self):

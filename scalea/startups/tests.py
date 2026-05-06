@@ -69,6 +69,7 @@ class StartupPublicProfileAPITests(TestCase):
             self.user,
             company_name='Handmade Co',
             slug='handmade-co',
+            is_published=True,
             short_description='Woodwork & ceramics',
             description='Full about text.',
             contact_email='info@handmade.co',
@@ -335,10 +336,10 @@ class StartupProfileAPITests(APITestCase):
             short_description='AI platform',
             website='https://techdynamic.test',
             tags=['ai', 'saas'],
+            is_published=True,
         )
 
         self.stranger = _make_user('stranger_startup', 'stranger@start.com')
-
         self.url = reverse('profile-detail', kwargs={'pk': self.owner.pk})
 
     def test_get_startup_profile_returns_full_payload(self):
@@ -410,3 +411,18 @@ class StartupProfileAPITests(APITestCase):
         url = reverse('profile-detail', kwargs={'pk': 9999})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_cannot_see_draft_profile(self):
+        self.profile.is_published = False
+        self.profile.save()
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_owner_can_see_their_own_draft_profile(self):
+        self.profile.is_published = False
+        self.profile.save()
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
