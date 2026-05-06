@@ -1,0 +1,17 @@
+[run]
+source = .
+omit =
+    manage.py
+    scalea/asgi.py
+    scalea/wsgi.py
+    */migrations/*
+    */tests/*
+    venv/*
+    .venv/*
+
+[report]
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    def __str__
+    def __repr__

@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+
 class LandingContentTest(TestCase):
     def test_landing_endpoint(self):
         response = self.client.get('/api/content/landing/')
