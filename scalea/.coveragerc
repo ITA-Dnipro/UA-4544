@@ -9,7 +9,6 @@ omit =
     *tests*
     *.venv*
     *__init__*
-
 [report]
 show_missing = True
 skip_covered = True
