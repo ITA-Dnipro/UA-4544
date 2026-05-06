@@ -119,11 +119,11 @@ class PasswordResetRequestTests(APITestCase):
     def setUp(self):
         cache.clear()
         self.url = '/api/auth/password-reset/'
-        self.email = "test@example.com"
+        self.email = 'test@example.com'
         self.user = User.objects.create_user(
             username=self.email,
             email=self.email,
-            password="OldP@ssword1"
+            password='Password123!'
         )
 
     @patch('users.views.EmailMultiAlternatives.send')

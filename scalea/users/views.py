@@ -50,7 +50,7 @@ def get_client_ip(request):
 
 
 def mask_email_for_log(email):
-    return hashlib.sha256(email.encode()).hexdigest()[:10] + "..."
+    return hashlib.sha256(email.encode()).hexdigest()[:10] + '...'
 
 
 class PasswordResetRequestView(APIView):
@@ -65,7 +65,9 @@ class PasswordResetRequestView(APIView):
 
         if is_password_reset_locked(email):
             return Response(
-                {'detail': 'Too many password reset requests for this email. Try again later.'},
+                {
+                    'detail': 'Too many password reset requests for this email. Try again later.'
+                },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -73,9 +75,7 @@ class PasswordResetRequestView(APIView):
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
-            user=user,
-            email=email,
-            ip_address=get_client_ip(request)
+            user=user, email=email, ip_address=get_client_ip(request)
         )
 
         if user:
@@ -101,7 +101,10 @@ class PasswordResetRequestView(APIView):
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email to %s', mask_email_for_log(email))
+                logger.exception(
+                    'Failed to send password reset email to %s',
+                    mask_email_for_log(email),
+                )
 
         return Response(
             {'detail': 'If the email exists, you will receive reset instructions.'},
@@ -231,4 +234,4 @@ class LogoutView(APIView):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_24_NO_CONTENT)

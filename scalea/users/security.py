@@ -1,21 +1,35 @@
+import hashlib
 from django.core.cache import cache
 
 
 MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_SECONDS = 15 * 60
+LOCKOUT_SECONDS = 15 * 60  
 
 
 PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_WINDOW_SECONDS = 3600
 
 
+def _normalize_email(email: str) -> str:
+    return hashlib.sha256(email.strip().lower().encode('utf-8')).hexdigest()
+
+
 
 def _fail_key(email: str) -> str:
-    return f'auth:login:fail:{email}'
+    return f'auth:login:count:{_normalize_email(email)}'
 
 
 def _lock_key(email: str) -> str:
-    return f'auth:login:lock:{email}'
+    return f'auth:login:lock:{_normalize_email(email)}'
+
+
+def _pr_count_key(email: str) -> str:
+    return f'auth:password_reset:count:{_normalize_email(email)}'
+
+
+def _pr_lock_key(email: str) -> str:
+    return f'auth:password_reset:lock:{_normalize_email(email)}'
+
 
 
 def is_locked(email: str) -> bool:
@@ -29,7 +43,7 @@ def register_failure(email: str) -> None:
     except ValueError:
         cache.set(key, 1, timeout=LOCKOUT_SECONDS)
         count = 1
-        
+
     if count >= MAX_FAILED_ATTEMPTS:
         cache.set(_lock_key(email), True, timeout=LOCKOUT_SECONDS)
 
@@ -38,14 +52,6 @@ def clear_failures(email: str) -> None:
     cache.delete(_fail_key(email))
     cache.delete(_lock_key(email))
 
-
-
-def _pr_count_key(email: str) -> str:
-    return f'auth:password_reset:count:{email}'
-
-
-def _pr_lock_key(email: str) -> str:
-    return f'auth:password_reset:lock:{email}'
 
 
 def is_password_reset_locked(email: str) -> bool:

@@ -24,7 +24,7 @@ class PasswordResetAudit(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='password_reset_audits'
+        related_name='password_reset_audits',
     )
     email = models.EmailField(help_text='Електронна пошта, введена користувачем')
     ip_address = models.GenericIPAddressField(null=True, blank=True)
