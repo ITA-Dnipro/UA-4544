@@ -16,6 +16,7 @@ from investors.serializers import (
     InvestorPublicProfileSerializer,
 )
 from rest_framework import generics, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -219,6 +220,7 @@ class LogoutView(APIView):
 
 class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsProfileOwnerOrAdmin]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
