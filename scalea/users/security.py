@@ -1,9 +1,9 @@
 import hashlib
+
 from django.core.cache import cache
 
-
 MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_SECONDS = 15 * 60  
+LOCKOUT_SECONDS = 15 * 60
 
 
 PASSWORD_RESET_MAX_ATTEMPTS = 5

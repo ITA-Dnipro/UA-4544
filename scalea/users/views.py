@@ -23,11 +23,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import PasswordResetAudit
 from .security import (
-    clear_failures, 
-    is_locked, 
-    register_failure,
+    clear_failures,
+    is_locked,
     is_password_reset_locked,
-    register_password_reset_request
+    register_failure,
+    register_password_reset_request,
 )
 from .serializers import (
     LoginSerializer,
@@ -81,7 +81,7 @@ class PasswordResetRequestView(APIView):
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            
+
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
 
@@ -156,7 +156,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *_args, _kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -200,7 +200,7 @@ class LoginView(APIView):
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
-        
+
         if remember:
             refresh.set_exp(lifetime=timedelta(days=30))
             access.set_exp(lifetime=timedelta(hours=12))
@@ -234,4 +234,4 @@ class LogoutView(APIView):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(status=status.HTTP_24_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)

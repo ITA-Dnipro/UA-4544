@@ -1,4 +1,3 @@
-import hashlib
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -7,13 +6,14 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from investors.models import InvestorProfile
 from startups.models import StartupProfile
+
 from users.tokens import password_reset_token
+
 from .models import PasswordResetAudit
 
 User = get_user_model()
