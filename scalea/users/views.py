@@ -8,6 +8,7 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.views import InvestorProfileDetailView
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -19,6 +20,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from startups.views import StartupPublicProfileView
 
 from .security import clear_failures, is_locked, register_failure
 from .serializers import (
@@ -202,3 +204,28 @@ class LogoutView(APIView):
         serializer.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UniversalProfileDetailView(APIView):
+    def get(self, request, *args, **kwargs):
+        response = StartupPublicProfileView.as_view()(request._request, *args, **kwargs)
+
+        if response.status_code == 404:
+            return InvestorProfileDetailView.as_view()(
+                request._request, *args, **kwargs
+            )
+
+        return response
+
+    def patch(self, request, *args, **kwargs):
+        response = StartupPublicProfileView.as_view()(request._request, *args, **kwargs)
+
+        if response.status_code == 404:
+            return InvestorProfileDetailView.as_view()(
+                request._request, *args, **kwargs
+            )
+
+        return response
+
+    def put(self, request, *args, **kwargs):
+        return self.patch(request, *args, **kwargs)

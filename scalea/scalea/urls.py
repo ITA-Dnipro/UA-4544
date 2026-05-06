@@ -15,11 +15,12 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-
-from dashboard.views import LandingContentAPIView
+from startups.views import PublishProfileView
+from users.views import UniversalProfileDetailView
 
 
 def health_check(_request):
@@ -32,5 +33,21 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
-    path('api/profiles/', include('startups.publish_urls')),
+    path(
+        'api/profiles/',
+        include(
+            [
+                path(
+                    '<int:pk>/publish/',
+                    PublishProfileView.as_view(),
+                    name='startup-publish',
+                ),
+                path(
+                    '<int:pk>/',
+                    UniversalProfileDetailView.as_view(),
+                    name='profile-detail',
+                ),
+            ]
+        ),
+    ),
 ]

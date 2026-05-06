@@ -68,7 +68,7 @@ class StartupPublicProfileAPITests(TestCase):
             tags=['craft', 'pottery'],
             website='https://handmade.example',
         )
-        self.url = reverse('startup-public-profile', kwargs={'pk': self.startup.pk})
+        self.url = reverse('profile-detail', kwargs={'pk': self.startup.pk})
 
     def test_returns_200_with_expected_schema(self):
         response = self.client.get(self.url)
@@ -91,7 +91,7 @@ class StartupPublicProfileAPITests(TestCase):
         self.assertIn('created_at', data)
 
     def test_returns_404_for_unknown_id(self):
-        url = reverse('startup-public-profile', kwargs={'pk': 99999})
+        url = reverse('profile-detail', kwargs={'pk': 99999})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 404)
@@ -270,7 +270,7 @@ class PublishProfilePermissionTests(APITestCase):
 
     def test_anonymous_cannot_publish(self):
         response = self.client.post(self.url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_stranger_cannot_publish(self):
         self.client.force_authenticate(user=self.stranger)
@@ -312,3 +312,78 @@ class PublishProfilePermissionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['detail'], 'Profile is already published.')
+
+
+class StartupProfileUpdateTests(APITestCase):
+    def setUp(self):
+        self.owner = _make_user('owner_update', 'owner_upd@test.com')
+        self.stranger = _make_user('stranger_update', 'stranger_upd@test.com')
+        self.profile = _make_startup(self.owner, company_name='Original Name')
+
+        self.url = reverse('profile-detail', kwargs={'pk': self.profile.pk})
+
+    def test_get_profile_public_access(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'Original Name')
+
+        self.assertIn('about_html', response.data)
+        self.assertIn('contact', response.data)
+
+    def test_owner_can_patch_profile(self):
+        self.client.force_authenticate(user=self.owner)
+        payload = {'company_name': 'Updated Name'}
+
+        response = self.client.patch(self.url, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'Updated Name')
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.company_name, 'Updated Name')
+
+    def test_owner_can_put_profile(self):
+        self.client.force_authenticate(user=self.owner)
+        payload = {
+            'company_name': 'Full Update',
+            'short_description': 'New short desc',
+            'description': 'New full description',
+            'contact_email': 'new@test.com',
+            'website': 'https://new-site.com',
+            'tags': ['new', 'tags'],
+        }
+
+        response = self.client.put(self.url, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'Full Update')
+        self.assertEqual(response.data['contact']['email'], 'new@test.com')
+
+    def test_stranger_cannot_update_profile(self):
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.patch(self.url, {'company_name': 'I am a hacker'})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.company_name, 'Original Name')
+
+    def test_anonymous_cannot_update_profile(self):
+        response = self.client.patch(self.url, {'company_name': 'Anonymous update'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_invalid_website_format_returns_400(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.patch(self.url, {'website': 'not-a-valid-url'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('website', response.data)
+
+    def test_update_returns_full_public_payload(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.patch(self.url, {'description': 'New info'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('about_html', response.data)
+        self.assertIn('followers_count', response.data)
+        self.assertIn('<p>New info</p>', response.data['about_html'])

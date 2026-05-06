@@ -1,8 +1,10 @@
 from django.urls import path
 
 from startups.views import StartupProjectListView, StartupPublicProfileView
+from startups.views import StartupListView
 
 urlpatterns = [
+    path('', StartupListView.as_view(), name='startup-list'),
     path(
         '<int:pk>/', StartupPublicProfileView.as_view(), name='startup-public-profile'
     ),
