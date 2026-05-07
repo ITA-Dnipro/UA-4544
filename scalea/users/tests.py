@@ -12,8 +12,6 @@ from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from startups.models import StartupProfile
 
-from users.models import User
-
 from users.tokens import password_reset_token
 
 from .models import PasswordResetAudit

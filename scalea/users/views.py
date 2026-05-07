@@ -12,26 +12,23 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-
 from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
     OutstandingToken,
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-
-from investors.models import InvestorProfile
-from investors.serializers import (
-    InvestorProfileUpdateSerializer,
-    InvestorPublicProfileSerializer,
-)
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
@@ -82,9 +79,7 @@ class PasswordResetRequestView(APIView):
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
-            user=user, 
-            email=email, 
-            ip_address=get_client_ip(request)
+            user=user, email=email, ip_address=get_client_ip(request)
         )
 
         if user:
@@ -164,7 +159,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -301,7 +296,7 @@ class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
 
         return serializers['update'] if is_update else serializers['read']
 
-    def update(self, request, *args, **kwargs):
+    def update(self, request, *args, **kwargs):  # noqa: ARG002
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 

@@ -19,11 +19,8 @@ from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-<<<<<<< HEAD
-=======
 from startups.views import PublishProfileView
 from users.views import UniversalProfileDetailView
->>>>>>> 336cd5b9332f008c27179e70677ffc1d70c069a9
 
 
 def health_check(_request):

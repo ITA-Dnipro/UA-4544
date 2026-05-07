@@ -1,21 +1,15 @@
-import hashlib
-
 from django.core.cache import cache
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_SECONDS = 15 * 60
 
 
-def _normalize_email(email: str) -> str:
-    return hashlib.sha256(email.strip().lower().encode('utf-8')).hexdigest()
-
-
 def _fail_key(email: str) -> str:
-    return f'auth:login:count:{_normalize_email(email)}'
+    return f'auth:login:fail:{email}'
 
 
 def _lock_key(email: str) -> str:
-    return f'auth:login:lock:{_normalize_email(email)}'
+    return f'auth:login:lock:{email}'
 
 
 def is_locked(email: str) -> bool:
@@ -24,12 +18,8 @@ def is_locked(email: str) -> bool:
 
 def register_failure(email: str) -> None:
     key = _fail_key(email)
-    try:
-        count = cache.incr(key)
-    except ValueError:
-        cache.set(key, 1, timeout=LOCKOUT_SECONDS)
-        count = 1
-
+    count = int(cache.get(key, 0)) + 1
+    cache.set(key, count, timeout=LOCKOUT_SECONDS)
     if count >= MAX_FAILED_ATTEMPTS:
         cache.set(_lock_key(email), True, timeout=LOCKOUT_SECONDS)
 
