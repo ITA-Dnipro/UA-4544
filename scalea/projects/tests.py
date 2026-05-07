@@ -1,6 +1,9 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 from startups.models import StartupProfile
 from users.models import User
 
@@ -44,3 +47,102 @@ class ProjectModelTests(TestCase):
         self.assertEqual(project.target_amount, Decimal('500000'))
         self.assertEqual(project.status, ProjectStatus.IDEA)
         self.assertEqual(project.visibility, ProjectVisibility.PUBLIC)
+
+
+class ProjectAPITests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='owner', is_startup=True, email='owner@test.com'
+        )
+        self.profile = StartupProfile.objects.create(
+            user=self.owner, company_name='Owner Startup'
+        )
+
+        self.project = Project.objects.create(
+            startup=self.profile, title='Initial Project', target_amount=1000
+        )
+
+        self.list_url = reverse('project-list')
+        self.detail_url = reverse('project-detail', kwargs={'pk': self.project.id})
+
+    def test_create_project_restricted_to_startups(self):
+        investor = User.objects.create_user(
+            username='inv', is_startup=False, is_investor=True
+        )
+        self.client.force_authenticate(user=investor)
+
+        response = self.client.post(
+            self.list_url,
+            {'title': 'Fail', 'target_amount': 100, 'description': 'desc'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_prevent_escalation_on_create(self):
+        other_user = User.objects.create_user(
+            username='other', is_startup=True, email='other@test.com'
+        )
+        other_profile = StartupProfile.objects.create(
+            user=other_user, company_name='Other Corp'
+        )
+
+        self.client.force_authenticate(user=self.owner)
+        payload = {
+            'title': 'My Project',
+            'startup': other_profile.id,
+            'target_amount': 1000,
+            'description': 'Description',
+        }
+        response = self.client.post(self.list_url, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        project = Project.objects.get(title='My Project')
+        self.assertEqual(project.startup, self.profile)
+
+    def test_update_restricted_to_owner(self):
+        stranger = User.objects.create_user(
+            username='stranger', is_startup=True, email='s@t.com'
+        )
+        self.client.force_authenticate(user=stranger)
+
+        response = self.client.patch(self.detail_url, {'title': 'Hacked Title'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_private_project_visibility(self):
+        private_project = Project.objects.create(
+            startup=self.profile,
+            title='Secret AI',
+            target_amount=10000,
+            visibility=ProjectVisibility.PRIVATE,
+        )
+        url = reverse('project-detail', kwargs={'pk': private_project.id})
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        stranger = User.objects.create_user(
+            username='stranger_viewer', is_startup=False, email='s@v.com'
+        )
+        self.client.force_authenticate(user=stranger)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], 'Secret AI')
+
+    def test_unlisted_project_is_not_in_list(self):
+        unlisted_project = Project.objects.create(
+            startup=self.profile,
+            title='Unlisted Idea',
+            target_amount=5000,
+            visibility=ProjectVisibility.UNLISTED,
+        )
+
+        response = self.client.get(reverse('project-list'))
+        titles = [p['title'] for p in response.data]
+        self.assertNotIn('Unlisted Idea', titles)
+
+        url = reverse('project-detail', kwargs={'pk': unlisted_project.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
