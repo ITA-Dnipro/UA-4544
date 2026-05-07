@@ -158,7 +158,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *_args, _kwargs):
+    def create(self, request, *args, **kwargs): # noqa: ARG002
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -189,10 +189,11 @@ class LoginView(APIView):
 
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            if 'detail' in serializer.errors or email:
+            if 'detail' in serializer.errors:
                 if email:
                     register_failure(email)
                 return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.validated_data['user']
