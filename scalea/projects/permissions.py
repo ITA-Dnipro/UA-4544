@@ -11,6 +11,7 @@ class IsStartupUser(permissions.BasePermission):
             request.user
             and request.user.is_authenticated
             and getattr(request.user, 'is_startup', False)
+            and hasattr(request.user, 'startupprofile')
         )
 
 
