@@ -4,6 +4,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import styles from "./Login.module.css";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 
 interface ILoginForm {
   email: string;
@@ -17,6 +18,8 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  const { login } = useAuth();
 
   const {
     register,
@@ -46,12 +49,33 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
     setServerError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const res = await fetch("/api/auth/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+          role: data.role,
+          remember: data.rememberMe,
+        }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message = payload?.detail
+          ? Array.isArray(payload.detail)
+            ? payload.detail[0]
+            : payload.detail
+          : "Invalid email or password.";
+        setServerError(message);
+        return;
+      }
+
+      login(payload.access, payload.refresh, payload.user);
       navigate("/");
     } catch (err) {
-      setServerError(
-        err instanceof Error ? err.message : "Server error occurred",
-      );
+      setServerError("Server error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
