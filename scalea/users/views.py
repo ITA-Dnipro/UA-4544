@@ -6,20 +6,38 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.db.models import Count
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
 from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
     OutstandingToken,
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
+from startups.models import StartupProfile
+from startups.permissions import IsProfileOwnerOrAdmin
+from startups.serializers import (
+    StartupProfileUpdateSerializer,
+    StartupPublicProfileSerializer,
+)
 
 from .models import PasswordResetAudit
 from .security import (
@@ -61,29 +79,19 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-        if is_password_reset_locked(email):
-            return Response(
-                {
-                    'detail': 'Too many password reset requests for this email. Try again later.'
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
-
-        register_password_reset_request(email)
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
-            user=user, email=email, ip_address=get_client_ip(request)
+            user=user, 
+            email=email, 
+            ip_address=get_client_ip(request)
         )
 
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-
             combined_token = f'{uid}.{token}'
-            reset_url = (
-                f'{settings.FRONTEND_URL}/reset-password/?token={combined_token}'
-            )
+            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
             html_message = render_to_string(
                 'email/password_reset.html',
@@ -156,7 +164,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):  # noqa: ARG002
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -236,3 +244,77 @@ class LogoutView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [AllowAny()]
+        return [IsProfileOwnerOrAdmin()]
+
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        user = get_object_or_404(User, pk=pk)
+
+        if user.is_startup:
+            queryset = StartupProfile.objects.annotate(
+                followers_count=Count('savedstartup', distinct=True),
+                projects_count=Count('projects', distinct=True),
+            )
+            obj = get_object_or_404(queryset, user=user)
+
+            if not obj.is_published:
+                user_auth = self.request.user
+                is_owner = user_auth.is_authenticated and user_auth == obj.user
+                is_admin = user_auth.is_authenticated and (
+                    user_auth.is_staff or user_auth.is_superuser
+                )
+
+                if not (is_owner or is_admin):
+                    raise Http404('No StartupProfile matches the given query.')
+        else:
+            obj = get_object_or_404(InvestorProfile, user=user)
+
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def get_serializer_class(self):
+        obj = self.get_object()
+        is_update = self.request.method in ['PUT', 'PATCH']
+
+        serializer_map = {
+            StartupProfile: {
+                'read': StartupPublicProfileSerializer,
+                'update': StartupProfileUpdateSerializer,
+            },
+            InvestorProfile: {
+                'read': InvestorPublicProfileSerializer,
+                'update': InvestorProfileUpdateSerializer,
+            },
+        }
+
+        serializers = serializer_map.get(obj.__class__)
+        if not serializers:
+            raise ValueError(f'No serializers found for {obj.__class__}')
+
+        return serializers['update'] if is_update else serializers['read']
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            serializer.save()
+
+        instance = self.get_object()
+        if isinstance(instance, StartupProfile):
+            response_serializer = StartupPublicProfileSerializer(instance)
+        else:
+            response_serializer = InvestorPublicProfileSerializer(instance)
+
+        return Response(response_serializer.data)

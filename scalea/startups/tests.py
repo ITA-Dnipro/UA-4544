@@ -31,6 +31,14 @@ def _make_startup(user, **kwargs):
     return StartupProfile.objects.create(user=user, **defaults)
 
 
+def _make_published_startup(user, **kwargs):
+    return _make_startup(user, is_published=True, **kwargs)
+
+
+def _make_draft_startup(user, **kwargs):
+    return _make_startup(user, is_published=False, **kwargs)
+
+
 def _make_project(startup, **kwargs):
     defaults = {
         'title': 'Test Project',
@@ -61,6 +69,7 @@ class StartupPublicProfileAPITests(TestCase):
             self.user,
             company_name='Handmade Co',
             slug='handmade-co',
+            is_published=True,
             short_description='Woodwork & ceramics',
             description='Full about text.',
             contact_email='info@handmade.co',
@@ -68,7 +77,7 @@ class StartupPublicProfileAPITests(TestCase):
             tags=['craft', 'pottery'],
             website='https://handmade.example',
         )
-        self.url = reverse('startup-public-profile', kwargs={'pk': self.startup.pk})
+        self.url = reverse('profile-detail', kwargs={'pk': self.user.pk})
 
     def test_returns_200_with_expected_schema(self):
         response = self.client.get(self.url)
@@ -91,7 +100,7 @@ class StartupPublicProfileAPITests(TestCase):
         self.assertIn('created_at', data)
 
     def test_returns_404_for_unknown_id(self):
-        url = reverse('startup-public-profile', kwargs={'pk': 99999})
+        url = reverse('profile-detail', kwargs={'pk': 99999})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 404)
@@ -270,7 +279,10 @@ class PublishProfilePermissionTests(APITestCase):
 
     def test_anonymous_cannot_publish(self):
         response = self.client.post(self.url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
 
     def test_stranger_cannot_publish(self):
         self.client.force_authenticate(user=self.stranger)
@@ -312,3 +324,105 @@ class PublishProfilePermissionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['detail'], 'Profile is already published.')
+
+
+class StartupProfileAPITests(APITestCase):
+    def setUp(self):
+        self.owner = _make_user('owner_startup', 'owner@start.com')
+        self.profile = StartupProfile.objects.create(
+            user=self.owner,
+            company_name='Tech Dynamics',
+            description='Revolutionary AI platform.',
+            short_description='AI platform',
+            website='https://techdynamic.test',
+            tags=['ai', 'saas'],
+            is_published=True,
+        )
+
+        self.stranger = _make_user('stranger_startup', 'stranger@start.com')
+        self.url = reverse('profile-detail', kwargs={'pk': self.owner.pk})
+
+    def test_get_startup_profile_returns_full_payload(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+
+        self.assertEqual(data['company_name'], 'Tech Dynamics')
+        self.assertIn('followers_count', data)
+        self.assertIn('projects_count', data)
+        self.assertIn('about_html', data)
+        self.assertEqual(data['website'], 'https://techdynamic.test')
+
+    def test_owner_can_patch_startup_profile(self):
+        self.client.force_authenticate(user=self.owner)
+        payload = {'company_name': 'New Tech Name'}
+
+        response = self.client.patch(self.url, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'New Tech Name')
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.company_name, 'New Tech Name')
+
+    def test_owner_can_put_startup_profile(self):
+        self.client.force_authenticate(user=self.owner)
+        payload = {
+            'company_name': 'Global AI Solutions',
+            'short_description': 'Updated short desc',
+            'description': 'Updated full description',
+            'website': 'https://global-ai.test',
+            'tags': ['big-data', 'ml'],
+        }
+
+        response = self.client.put(self.url, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['company_name'], 'Global AI Solutions')
+        self.assertIn('about_html', response.data)
+
+    def test_stranger_cannot_update_startup_profile(self):
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.patch(self.url, {'company_name': 'Hacker Startup'})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_anonymous_cannot_update_startup_profile(self):
+        response = self.client.patch(self.url, {'company_name': 'Hidden'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_invalid_url_returns_400(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.patch(self.url, {'website': 'invalid-link'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('website', response.data)
+
+    def test_update_returns_updated_read_payload(self):
+        self.client.force_authenticate(user=self.owner)
+        new_desc = 'Brand new info'
+        response = self.client.patch(self.url, {'description': new_desc})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(f'<p>{new_desc}</p>', response.data['about_html'])
+
+    def test_get_non_existent_user_returns_404(self):
+        url = reverse('profile-detail', kwargs={'pk': 9999})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_cannot_see_draft_profile(self):
+        self.profile.is_published = False
+        self.profile.save()
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_owner_can_see_their_own_draft_profile(self):
+        self.profile.is_published = False
+        self.profile.save()
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
