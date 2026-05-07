@@ -7,8 +7,8 @@ from startups.models import StartupProfile
 class StartupPublicProfileSerializer(serializers.ModelSerializer):
     about_html = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
-    followers_count = serializers.SerializerMethodField()
-    projects_count = serializers.SerializerMethodField()
+    followers_count = serializers.SerializerMethodField(read_only=True)
+    projects_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = StartupProfile
@@ -44,3 +44,26 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
 
     def get_projects_count(self, obj):
         return obj.projects_count
+
+
+class StartupProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StartupProfile
+        fields = [
+            'company_name',
+            'hero_image_url',
+            'logo_url',
+            'short_description',
+            'description',
+            'contact_email',
+            'contact_phone',
+            'website',
+            'tags',
+        ]
+
+    def validate_website(self, value):
+        if value and not value.startswith(('http://', 'https://')):
+            raise serializers.ValidationError(
+                'Enter a valid URL starting with http or https.'
+            )
+        return value

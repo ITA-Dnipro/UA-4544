@@ -5,11 +5,20 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.db.models import Count
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -19,6 +28,12 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from startups.models import StartupProfile
+from startups.permissions import IsProfileOwnerOrAdmin
+from startups.serializers import (
+    StartupProfileUpdateSerializer,
+    StartupPublicProfileSerializer,
+)
 
 from .security import clear_failures, is_locked, register_failure
 from .serializers import (
@@ -202,3 +217,78 @@ class LogoutView(APIView):
         serializer.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [AllowAny()]
+        return [IsProfileOwnerOrAdmin()]
+
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        user = get_object_or_404(User, pk=pk)
+
+        if user.is_startup:
+            queryset = StartupProfile.objects.annotate(
+                followers_count=Count('savedstartup', distinct=True),
+                projects_count=Count('projects', distinct=True),
+            )
+            obj = get_object_or_404(queryset, user=user)
+
+            if not obj.is_published:
+                user_auth = self.request.user
+                is_owner = user_auth.is_authenticated and user_auth == obj.user
+                is_admin = user_auth.is_authenticated and (
+                    user_auth.is_staff or user_auth.is_superuser
+                )
+
+                if not (is_owner or is_admin):
+                    raise Http404('No StartupProfile matches the given query.')
+        else:
+            obj = get_object_or_404(InvestorProfile, user=user)
+
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def get_serializer_class(self):
+        obj = self.get_object()
+        is_update = self.request.method in ['PUT', 'PATCH']
+
+        serializer_map = {
+            StartupProfile: {
+                'read': StartupPublicProfileSerializer,
+                'update': StartupProfileUpdateSerializer,
+            },
+            InvestorProfile: {
+                'read': InvestorPublicProfileSerializer,
+                'update': InvestorProfileUpdateSerializer,
+            },
+        }
+
+        serializers = serializer_map.get(obj.__class__)
+
+        if not serializers:
+            raise ValueError(f'No serializers found for {obj.__class__}')
+
+        return serializers['update'] if is_update else serializers['read']
+
+    def update(self, request, *_args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            serializer.save()
+
+        instance = self.get_object()
+        if isinstance(instance, StartupProfile):
+            response_serializer = StartupPublicProfileSerializer(instance)
+        else:
+            response_serializer = InvestorPublicProfileSerializer(instance)
+
+        return Response(response_serializer.data)
