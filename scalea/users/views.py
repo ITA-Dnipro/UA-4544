@@ -25,9 +25,7 @@ from .models import PasswordResetAudit
 from .security import (
     clear_failures,
     is_locked,
-    is_password_reset_locked,
     register_failure,
-    register_password_reset_request,
 )
 from .serializers import (
     LoginSerializer,
@@ -130,7 +128,7 @@ class PasswordResetConfirmView(APIView):
             uid_b64, token = raw_token.split('.', 1)
             uid = force_str(urlsafe_base64_decode(uid_b64))
             user = User.objects.filter(id=uid).first()
-        except (ValueError, TypeError, Exception):
+        except (ValueError, TypeError):
             user = None
 
         if not user or not password_reset_token.check_token(user, token):
