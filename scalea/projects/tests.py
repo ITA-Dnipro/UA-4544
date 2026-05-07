@@ -61,15 +61,18 @@ class ProjectAPITests(APITestCase):
         self.project = Project.objects.create(
             startup=self.profile, title='Initial Project', target_amount=1000
         )
+        self.investor = User.objects.create_user(
+            username='investor',
+            is_startup=False,
+            is_investor=True,
+            email='inv@test.com',
+        )
 
         self.list_url = reverse('project-list')
         self.detail_url = reverse('project-detail', kwargs={'pk': self.project.id})
 
     def test_create_project_restricted_to_startups(self):
-        investor = User.objects.create_user(
-            username='inv', is_startup=False, is_investor=True
-        )
-        self.client.force_authenticate(user=investor)
+        self.client.force_authenticate(user=self.investor)
 
         response = self.client.post(
             self.list_url,
@@ -131,18 +134,31 @@ class ProjectAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['title'], 'Secret AI')
 
-    def test_unlisted_project_is_not_in_list(self):
-        unlisted_project = Project.objects.create(
+    def test_unlisted_project_access_anonymous(self):
+        project = Project.objects.create(
+            title='Unlisted Project',
             startup=self.profile,
-            title='Unlisted Idea',
             target_amount=5000,
             visibility=ProjectVisibility.UNLISTED,
         )
+        url = reverse('project-detail', kwargs={'pk': project.pk})
 
-        response = self.client.get(reverse('project-list'))
-        titles = [p['title'] for p in response.data]
-        self.assertNotIn('Unlisted Idea', titles)
+        self.client.logout()
 
-        url = reverse('project-detail', kwargs={'pk': unlisted_project.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unlisted_project_access_authenticated(self):
+        project = Project.objects.create(
+            title='Unlisted Project',
+            startup=self.profile,
+            target_amount=5000,
+            visibility=ProjectVisibility.UNLISTED,
+        )
+        url = reverse('project-detail', kwargs={'pk': project.pk})
+
+        self.client.force_authenticate(user=self.investor)
+
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], 'Unlisted Project')

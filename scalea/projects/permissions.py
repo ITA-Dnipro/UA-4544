@@ -27,10 +27,10 @@ class ProjectVisibilityPermission(permissions.BasePermission):
         if obj.visibility == ProjectVisibility.PUBLIC:
             return True
 
-        if obj.visibility == ProjectVisibility.UNLISTED:
-            return True
-
         if not request.user or not request.user.is_authenticated:
             return False
+
+        if obj.visibility == ProjectVisibility.UNLISTED:
+            return True
 
         return obj.startup.user == request.user or request.user.is_superuser
