@@ -53,7 +53,7 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 
-  test("successful login calls login function and navigates", async () => {
+  test("successful login calls login function with remember option", async () => {
     (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -72,12 +72,17 @@ describe("LoginPage", () => {
       target: { value: "password123" },
     });
 
+    const rememberCheckbox = screen.getByLabelText(/remember me/i);
+    fireEvent.click(rememberCheckbox);
+
     fireEvent.click(screen.getByRole("button", { name: /log in/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/auth/login/",
-        expect.any(Object),
+        expect.objectContaining({
+          method: "POST",
+        }),
       );
     });
 
@@ -86,6 +91,7 @@ describe("LoginPage", () => {
         "fake-access",
         "fake-refresh",
         expect.objectContaining({ email: "test@example.com" }),
+        true,
       );
     });
 

@@ -77,7 +77,7 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      login(payload.access, payload.refresh, payload.user);
+      login(payload.access, payload.refresh, payload.user, data.rememberMe);
       navigate("/");
     } catch {
       setServerError("Server error occurred. Please try again.");

@@ -26,17 +26,18 @@ const createMockToken = (expiresInMinutes: number) => {
   return `header.${payload}.signature`;
 };
 
-const TestComponent = () => {
+const TestComponent = ({ remember = true }: { remember?: boolean }) => {
   const auth = useContext(AuthContext);
   return (
     <div>
       <button
         onClick={() =>
-          auth?.login(createMockToken(15), "refresh-123", {
-            id: 1,
-            email: "test@test.com",
-            role: "startup",
-          })
+          auth?.login(
+            createMockToken(15),
+            "refresh-123",
+            { id: 1, email: "test@test.com", role: "startup" },
+            remember,
+          )
         }
       >
         Login
@@ -50,6 +51,7 @@ describe("AuthProvider Logic", () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ access: createMockToken(15) }),
@@ -60,10 +62,10 @@ describe("AuthProvider Logic", () => {
     vi.useRealTimers();
   });
 
-  it("should login and schedule refresh", async () => {
+  it("should store token in localStorage when remember is true", async () => {
     render(
       <AuthProvider>
-        <TestComponent />
+        <TestComponent remember={true} />
       </AuthProvider>,
     );
 
@@ -72,21 +74,28 @@ describe("AuthProvider Logic", () => {
     });
 
     expect(localStorage.getItem("refresh_token")).toBe("refresh-123");
-
-    await act(async () => {
-      vi.runOnlyPendingTimers();
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/refresh/"),
-      expect.any(Object),
-    );
+    expect(sessionStorage.getItem("refresh_token")).toBeNull();
   });
 
-  it("should logout when refresh fails", async () => {
+  it("should store token in sessionStorage when remember is false", async () => {
     render(
       <AuthProvider>
-        <TestComponent />
+        <TestComponent remember={false} />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      screen.getByText("Login").click();
+    });
+
+    expect(sessionStorage.getItem("refresh_token")).toBe("refresh-123");
+    expect(localStorage.getItem("refresh_token")).toBeNull();
+  });
+
+  it("should logout and clear both storages when refresh fails", async () => {
+    render(
+      <AuthProvider>
+        <TestComponent remember={true} />
       </AuthProvider>,
     );
 
@@ -101,5 +110,6 @@ describe("AuthProvider Logic", () => {
     });
 
     expect(localStorage.getItem("refresh_token")).toBeNull();
+    expect(sessionStorage.getItem("refresh_token")).toBeNull();
   });
 });

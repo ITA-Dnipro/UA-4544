@@ -16,7 +16,12 @@ interface AuthContextType {
   user: User | null;
   accessToken: string | null;
   isLoading: boolean;
-  login: (accessToken: string, refreshToken: string, user: User) => void;
+  login: (
+    accessToken: string,
+    refreshToken: string,
+    user: User,
+    remember: boolean,
+  ) => void;
   logout: () => void;
 }
 
@@ -31,11 +36,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const logout = useCallback(async () => {
-    const refresh = localStorage.getItem("refresh_token");
+    const refresh =
+      localStorage.getItem("refresh_token") ||
+      sessionStorage.getItem("refresh_token");
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("refresh_token");
     if (refresh) {
       await fetch("/api/auth/logout/", {
         method: "POST",
@@ -85,17 +93,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const login = useCallback(
-    (access: string, refresh: string, userData: User) => {
+    (access: string, refresh: string, userData: User, remember: boolean) => {
       setAccessToken(access);
       setUser(userData);
-      localStorage.setItem("refresh_token", refresh);
+      if (remember) {
+        localStorage.setItem("refresh_token", refresh);
+      } else {
+        sessionStorage.setItem("refresh_token", refresh);
+      }
       scheduleRefresh(refresh, access);
     },
     [scheduleRefresh],
   );
 
   useEffect(() => {
-    const refresh = localStorage.getItem("refresh_token");
+    const refresh =
+      localStorage.getItem("refresh_token") ||
+      sessionStorage.getItem("refresh_token");
     if (!refresh) {
       setIsLoading(false);
       return;
