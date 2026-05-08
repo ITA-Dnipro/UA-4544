@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
+    path('api/users/', include('investors.urls')),
     path(
         'api/profiles/',
         include(

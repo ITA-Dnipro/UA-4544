@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from startups.models import StartupProfile
 
-from investors.models import InvestorProfile, SavedStartup
+from investors.models import InvestorProfile, SavedItem, SavedStartup
 
 User = get_user_model()
 
@@ -168,3 +168,136 @@ class InvestorProfileAPITests(APITestCase):
         invalid_url = reverse('profile-detail', kwargs={'pk': 9999})
         response = self.client.get(invalid_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class SavedItemAPITests(APITestCase):
+    def setUp(self):
+        self.investor_user = User.objects.create_user(
+            username='investor@test.com',
+            email='investor@test.com',
+            password='Password123!',
+            is_investor=True,
+            is_active=True,
+        )
+        self.investor_profile = InvestorProfile.objects.create(
+            user=self.investor_user,
+            company_name='Test VC',
+        )
+        startup_user = User.objects.create_user(
+            username='startup@test.com',
+            email='startup@test.com',
+            password='Password123!',
+            is_startup=True,
+            is_active=True,
+        )
+        self.startup = StartupProfile.objects.create(
+            user=startup_user,
+            company_name='Test Startup',
+        )
+        self.url = f'/api/users/{self.investor_user.id}/saved/'
+
+    def test_create_saved_item_returns_201(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('saved_id', response.data)
+        self.assertIn('saved_at', response.data)
+
+    def test_create_duplicate_is_idempotent_returns_200(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
+        response1 = self.client.post(self.url, payload, format='json')
+        response2 = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        self.assertEqual(response1.data['saved_id'], response2.data['saved_id'])
+        self.assertEqual(
+            SavedItem.objects.filter(investor=self.investor_profile).count(), 1
+        )
+
+    def test_create_invalid_target_id_returns_404(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {'target_type': 'startup', 'target_id': '99999'}
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_create_invalid_target_type_returns_400(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {'target_type': 'banana', 'target_id': '1'}
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_unauthenticated_returns_401(self):
+        payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
+        response = self.client.post(self.url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_non_investor_returns_403(self):
+        startup_user = User.objects.create_user(
+            username='startup2@test.com',
+            email='startup2@test.com',
+            password='Password123!',
+            is_startup=True,
+            is_investor=False,
+            is_active=True,
+        )
+        self.client.force_authenticate(user=startup_user)
+        url = f'/api/users/{startup_user.id}/saved/'
+        payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_wrong_user_id_returns_403(self):
+        other_user = User.objects.create_user(
+            username='other@test.com',
+            email='other@test.com',
+            password='Password123!',
+            is_investor=True,
+            is_active=True,
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        url = f'/api/users/{other_user.id}/saved/'
+        payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_saved_item_returns_204(self):
+        self.client.force_authenticate(user=self.investor_user)
+        saved_item = SavedItem.objects.create(
+            investor=self.investor_profile,
+            target_type='startup',
+            target_id=str(self.startup.pk),
+        )
+        url = f'/api/users/{self.investor_user.id}/saved/{saved_item.pk}/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(SavedItem.objects.filter(pk=saved_item.pk).exists())
+
+    def test_delete_nonexistent_returns_404(self):
+        self.client.force_authenticate(user=self.investor_user)
+        url = f'/api/users/{self.investor_user.id}/saved/99999/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_wrong_user_returns_403(self):
+        other_investor_user = User.objects.create_user(
+            username='other_inv@test.com',
+            email='other_inv@test.com',
+            password='Password123!',
+            is_investor=True,
+            is_active=True,
+        )
+        other_investor_profile = InvestorProfile.objects.create(
+            user=other_investor_user,
+            company_name='Other VC',
+        )
+        saved_item = SavedItem.objects.create(
+            investor=other_investor_profile,
+            target_type='startup',
+            target_id=str(self.startup.pk),
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        url = f'/api/users/{other_investor_user.id}/saved/{saved_item.pk}/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

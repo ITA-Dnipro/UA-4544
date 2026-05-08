@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import InvestorProfile
+from .models import InvestorProfile, SavedItem
 
 
 class InvestorPublicProfileSerializer(serializers.ModelSerializer):
@@ -31,3 +31,16 @@ class InvestorProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvestorProfile
         fields = ['company_name', 'bio', 'investment_focus', 'website']
+
+
+class SavedItemCreateSerializer(serializers.Serializer):
+    target_type = serializers.ChoiceField(choices=['company', 'startup', 'project'])
+    target_id = serializers.CharField()
+
+
+class SavedItemResponseSerializer(serializers.ModelSerializer):
+    saved_id = serializers.IntegerField(source='id')
+
+    class Meta:
+        model = SavedItem
+        fields = ['saved_id', 'saved_at']
