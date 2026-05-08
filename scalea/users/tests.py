@@ -161,9 +161,7 @@ class PasswordResetRequestTests(APITestCase):
     def test_audit_log_includes_user_agent(self):
         """Test that audit log captures user agent."""
         self.client.post(
-            self.url,
-            {'email': self.email},
-            HTTP_USER_AGENT='Mozilla/5.0 Test Browser'
+            self.url, {'email': self.email}, HTTP_USER_AGENT='Mozilla/5.0 Test Browser'
         )
 
         audit = PasswordResetAudit.objects.filter(
