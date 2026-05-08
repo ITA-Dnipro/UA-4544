@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from datetime import timedelta
 
@@ -35,7 +36,12 @@ from startups.serializers import (
     StartupPublicProfileSerializer,
 )
 
-from .security import clear_failures, is_locked, register_failure
+from .models import PasswordResetAudit
+from .security import (
+    clear_failures,
+    is_locked,
+    register_failure,
+)
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
@@ -47,6 +53,17 @@ from .tokens import password_reset_token
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def mask_email_for_log(email):
+    return hashlib.sha256(email.encode()).hexdigest()[:10] + '...'
 
 
 class PasswordResetRequestView(APIView):
@@ -61,33 +78,39 @@ class PasswordResetRequestView(APIView):
 
         user = User.objects.filter(email=email).first()
 
+        PasswordResetAudit.objects.create(
+            user=user, email=email, ip_address=get_client_ip(request)
+        )
+
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
             html_message = render_to_string(
                 'email/password_reset.html',
-                {
-                    'reset_url': reset_url,
-                },
+                {'reset_url': reset_url},
             )
+
             email_msg = EmailMultiAlternatives(
                 subject='Password Reset — Scalea',
                 body=f'Reset your password: {reset_url}',
-                from_email=settings.EMAIL_HOST_USER,
+                from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
             )
             email_msg.attach_alternative(html_message, 'text/html')
+
             try:
                 email_msg.send(fail_silently=False)
             except Exception:
-                logger.exception('Failed to send password reset email')
+                logger.exception(
+                    'Failed to send password reset email to %s',
+                    mask_email_for_log(email),
+                )
 
         return Response(
-            {'detail': 'If this email exists, you will receive a reset link.'},
+            {'detail': 'If the email exists, you will receive reset instructions.'},
             status=status.HTTP_200_OK,
         )
 
@@ -105,9 +128,9 @@ class PasswordResetConfirmView(APIView):
         password = serializer.validated_data['password']
 
         try:
-            uid, token = raw_token.split('.', 1)
-            decoded_uid = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.filter(id=decoded_uid).first()
+            uid_b64, token = raw_token.split('.', 1)
+            uid = force_str(urlsafe_base64_decode(uid_b64))
+            user = User.objects.filter(id=uid).first()
         except (ValueError, TypeError):
             user = None
 
@@ -124,7 +147,7 @@ class PasswordResetConfirmView(APIView):
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
-        logger.info('Password reset for user: %s', user.pk)
+        logger.info('Password reset successful for user ID: %s', user.pk)
 
         return Response(
             {'detail': 'Password changed successfully'},
@@ -136,7 +159,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *_args, **_kwargs):
+    def create(self, request, *args, **kwargs):  # noqa: ARG002
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -171,6 +194,7 @@ class LoginView(APIView):
                 if email:
                     register_failure(email)
                 return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.validated_data['user']
@@ -180,11 +204,10 @@ class LoginView(APIView):
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
+
         if remember:
             refresh.set_exp(lifetime=timedelta(days=30))
             access.set_exp(lifetime=timedelta(hours=12))
-
-        role = serializer.validated_data['role']
 
         return Response(
             {
@@ -193,7 +216,7 @@ class LoginView(APIView):
                 'user': {
                     'id': user.id,
                     'email': user.email,
-                    'role': role,
+                    'role': serializer.validated_data.get('role'),
                 },
             },
             status=status.HTTP_200_OK,
@@ -215,7 +238,6 @@ class LogoutView(APIView):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -269,13 +291,12 @@ class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
         }
 
         serializers = serializer_map.get(obj.__class__)
-
         if not serializers:
             raise ValueError(f'No serializers found for {obj.__class__}')
 
         return serializers['update'] if is_update else serializers['read']
 
-    def update(self, request, *_args, **kwargs):
+    def update(self, request, *args, **kwargs):  # noqa: ARG002
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
