@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0003_alter_passwordresetaudit_user'),
+        ('users', '0004_merge_20260508_1126'),
     ]
 
     operations = [
