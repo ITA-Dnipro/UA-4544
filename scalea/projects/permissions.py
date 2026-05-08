@@ -10,16 +10,26 @@ class IsStartupUser(permissions.BasePermission):
         return bool(
             request.user
             and request.user.is_authenticated
-            and getattr(request.user, 'is_startup', False)
+            and request.user.is_startup
             and hasattr(request.user, 'startupprofile')
         )
 
 
-class IsProjectOwnerOrAdmin(permissions.BasePermission):
+class IsProjectOwnerOrOrgAdmin(permissions.BasePermission):
     message = 'You do not have permission to perform this action on this project.'
 
     def has_object_permission(self, request, _view, obj):
-        return request.user == obj.startup.user or request.user.is_superuser
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser or user.is_staff:
+            return True
+
+        is_owner = obj.startup.user == user
+        is_admin = user.is_org_admin and obj.startup.user == user
+
+        return is_owner or is_admin
 
 
 class ProjectVisibilityPermission(permissions.BasePermission):
@@ -30,7 +40,18 @@ class ProjectVisibilityPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        if obj.visibility == ProjectVisibility.UNLISTED:
+        if request.user.is_superuser or request.user.is_staff:
             return True
 
-        return obj.startup.user == request.user or request.user.is_superuser
+        if obj.visibility == ProjectVisibility.UNLISTED:
+            return (
+                obj.startup.user == request.user
+                or (request.user.is_org_admin and obj.startup.user == request.user)
+                or obj.investment_set.filter(
+                    investor_profile__user=request.user
+                ).exists()
+            )
+
+        return obj.startup.user == request.user or (
+            request.user.is_org_admin and obj.startup.user == request.user
+        )

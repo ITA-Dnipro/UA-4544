@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from investors.models import Investment, InvestorProfile
 from rest_framework import status
 from rest_framework.test import APITestCase
 from startups.models import StartupProfile
@@ -52,7 +53,7 @@ class ProjectModelTests(TestCase):
 class ProjectAPITests(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(
-            username='owner', is_startup=True, email='owner@test.com'
+            username='owner', is_startup=True, is_org_admin=True, email='owner@test.com'
         )
         self.profile = StartupProfile.objects.create(
             user=self.owner, company_name='Owner Startup'
@@ -65,7 +66,12 @@ class ProjectAPITests(APITestCase):
             username='investor',
             is_startup=False,
             is_investor=True,
+            is_org_admin=False,
             email='inv@test.com',
+        )
+
+        self.investor_profile = InvestorProfile.objects.create(
+            user=self.investor, company_name='Angel Investors Inc'
         )
 
         self.list_url = reverse('project-list')
@@ -148,7 +154,7 @@ class ProjectAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_unlisted_project_access_authenticated(self):
+    def test_unlisted_project_access_for_investor(self):
         project = Project.objects.create(
             title='Unlisted Project',
             startup=self.profile,
@@ -158,7 +164,25 @@ class ProjectAPITests(APITestCase):
         url = reverse('project-detail', kwargs={'pk': project.pk})
 
         self.client.force_authenticate(user=self.investor)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        Investment.objects.create(
+            investor_profile=self.investor_profile, project=project, amount=1000
+        )
 
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['title'], 'Unlisted Project')
+
+    def test_update_restricted_for_non_admin_member(self):
+        member_user = User.objects.create_user(
+            username='member',
+            email='member@test.com',
+            is_startup=True,
+            is_org_admin=False,
+        )
+        self.client.force_authenticate(user=member_user)
+
+        response = self.client.patch(self.detail_url, {'title': 'Hacked'})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

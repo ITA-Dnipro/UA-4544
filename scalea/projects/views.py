@@ -3,7 +3,7 @@ from rest_framework import permissions, viewsets
 
 from .models import Project, ProjectVisibility
 from .permissions import (
-    IsProjectOwnerOrAdmin,
+    IsProjectOwnerOrOrgAdmin,
     IsStartupUser,
     ProjectVisibilityPermission,
 )
@@ -26,7 +26,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsStartupUser()]
 
         if self.action in ['update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), IsProjectOwnerOrAdmin()]
+            return [permissions.IsAuthenticated(), IsProjectOwnerOrOrgAdmin()]
 
         return [permissions.IsAuthenticated()]
 
