@@ -12,6 +12,27 @@ interface User {
   role: string;
 }
 
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base64.length % 4;
+    const paddedBase64 = pad ? base64 + "=".repeat(4 - pad) : base64;
+
+    return JSON.parse(
+      decodeURIComponent(
+        atob(paddedBase64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      ),
+    );
+  } catch (error) {
+    console.error("JWT Decode Error:", error);
+    return null;
+  }
+};
+
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
@@ -57,8 +78,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     (refreshToken: string, token: string) => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
+      const payload = decodeJWT(token);
+      if (!payload) {
+        logout();
+        return;
+      }
+
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
         const expiresAt = payload.exp * 1000;
         const now = Date.now();
 
@@ -123,13 +149,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
         setAccessToken(data.access);
-        const payload = JSON.parse(atob(data.access.split(".")[1]));
-        setUser({
-          id: payload.user_id,
-          email: payload.email,
-          role: payload.role,
-        });
-        scheduleRefresh(refresh, data.access);
+        const payload = decodeJWT(data.access);
+        if (payload) {
+          setUser({
+            id: payload.user_id,
+            email: payload.email,
+            role: payload.role,
+          });
+          scheduleRefresh(refresh, data.access);
+        } else {
+          logout();
+        }
       })
       .catch(logout)
       .finally(() => {
