@@ -16,3 +16,24 @@ class ProjectCardSerializer(serializers.ModelSerializer):
 
     def get_thumbnail(self, _obj):
         """Project has no image field yet; return None until one is added."""
+
+
+class ProjectDetailSerializer(serializers.ModelSerializer):
+    startup = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            'id',
+            'startup',
+            'title',
+            'slug',
+            'short_description',
+            'description',
+            'status',
+            'target_amount',
+            'raised_amount',
+            'currency',
+            'visibility',
+        ]
+        read_only_fields = ['id', 'slug', 'raised_amount']

@@ -7,6 +7,10 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     is_startup = models.BooleanField(default=False)
     is_investor = models.BooleanField(default=False)
+    is_org_admin = models.BooleanField(
+        default=False,
+        help_text="Designates whether this user can manage the organization's projects.",
+    )
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

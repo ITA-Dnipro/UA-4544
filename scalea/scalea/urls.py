@@ -51,4 +51,5 @@ urlpatterns = [
             ]
         ),
     ),
+    path('api/projects/', include('projects.urls')),
 ]
