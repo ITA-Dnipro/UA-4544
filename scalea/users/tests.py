@@ -317,7 +317,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': '123',  # Too weak
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn('password', response.data)
 
     def test_common_password_returns_422(self):
@@ -330,7 +330,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': 'password123',  # Common password
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn('password', response.data)
 
     def test_numeric_password_returns_422(self):
@@ -343,7 +343,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': '12345678',  # All numeric
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn('password', response.data)
 
     def test_missing_uid_returns_400(self):
@@ -369,7 +369,7 @@ class PasswordResetConfirmViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_missing_password_returns_400(self):
-        """Test that missing password returns 400."""
+        """Test that missing password returns 422 (validation error)."""
         response = self.client.post(
             self.url,
             {
@@ -377,7 +377,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'token': self.token,
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_token_single_use_enforced_by_expiry(self):
         """Test that used token cannot be reused (enforced by token generator)."""
@@ -405,7 +405,7 @@ class PasswordResetConfirmViewTest(APITestCase):
 
     def test_user_can_login_with_new_password_after_reset(self):
         """Test that user can login with new password after reset."""
-        self.client.post(
+        response = self.client.post(
             self.url,
             {
                 'uid': self.uid,
@@ -413,9 +413,12 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': 'NewP@ssword1',
             },
         )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Activate user so they can login
+        # Refresh user from database and activate
+        self.user.refresh_from_db()
         self.user.is_active = True
+        self.user.is_verified = True
         self.user.is_startup = True
         self.user.save()
         

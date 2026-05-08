@@ -125,7 +125,18 @@ class PasswordResetConfirmView(APIView):
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            # Return 422 for password validation errors
+            if 'password' in serializer.errors:
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            # Return 400 for other validation errors (uid, token)
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         uid_b64 = serializer.validated_data['uid']
         token = serializer.validated_data['token']
