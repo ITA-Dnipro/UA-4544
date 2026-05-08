@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, type Mock } from "vitest";
 import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import LoginPage from "./Login";
@@ -28,10 +28,12 @@ const renderWithRouter = (ui: React.ReactElement) => {
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAuth as any).mockReturnValue({
+
+    (useAuth as Mock).mockReturnValue({
       login: mockLogin,
     });
-    global.fetch = vi.fn();
+
+    global.fetch = vi.fn() as Mock;
   });
 
   test("renders all fields", () => {
@@ -52,7 +54,7 @@ describe("LoginPage", () => {
   });
 
   test("successful login calls login function and navigates", async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         access: "fake-access",
@@ -91,7 +93,7 @@ describe("LoginPage", () => {
   });
 
   test("displays server error on failed login", async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ detail: "Invalid credentials" }),
     });
