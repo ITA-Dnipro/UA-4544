@@ -79,7 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
       const payload = decodeJWT(token);
-      if (!payload) {
+
+      if (!payload || typeof payload.exp !== "number") {
+        console.error("Invalid token payload: missing expiration.");
         logout();
         return;
       }
@@ -124,8 +126,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setUser(userData);
       if (remember) {
         localStorage.setItem("refresh_token", refresh);
+        sessionStorage.removeItem("refresh_token");
       } else {
         sessionStorage.setItem("refresh_token", refresh);
+        localStorage.removeItem("refresh_token");
       }
       scheduleRefresh(refresh, access);
     },
