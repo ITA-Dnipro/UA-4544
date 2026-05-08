@@ -142,14 +142,14 @@ class PasswordResetRequestTests(APITestCase):
         initial_count = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_REQUESTED
         ).count()
-        
+
         self.client.post(self.url, {'email': self.email})
-        
+
         new_count = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_REQUESTED
         ).count()
         self.assertEqual(new_count, initial_count + 1)
-        
+
         audit = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_REQUESTED
         ).latest('created_at')
@@ -165,7 +165,7 @@ class PasswordResetRequestTests(APITestCase):
             {'email': self.email},
             HTTP_USER_AGENT='Mozilla/5.0 Test Browser'
         )
-        
+
         audit = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_REQUESTED
         ).latest('created_at')
@@ -203,7 +203,7 @@ class PasswordResetConfirmViewTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['detail'], 'Password changed successfully.')
-        
+
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewP@ssword1'))
 
@@ -212,7 +212,7 @@ class PasswordResetConfirmViewTest(APITestCase):
         initial_count = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_CONFIRMED
         ).count()
-        
+
         self.client.post(
             self.url,
             {
@@ -221,12 +221,12 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': 'NewP@ssword1',
             },
         )
-        
+
         new_count = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_CONFIRMED
         ).count()
         self.assertEqual(new_count, initial_count + 1)
-        
+
         audit = PasswordResetAudit.objects.filter(
             action=PasswordResetAudit.ACTION_CONFIRMED
         ).latest('created_at')
@@ -246,7 +246,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': 'NewP@ssword1',
             },
         )
-        
+
         refresh_response = self.client.post(
             '/api/auth/refresh/',
             {'refresh': refresh},
@@ -390,7 +390,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'password': 'NewP@ssword1',
             },
         )
-        
+
         # Django's PasswordResetTokenGenerator automatically invalidates
         # tokens after first use by checking password_changed_date
         response = self.client.post(
@@ -414,14 +414,14 @@ class PasswordResetConfirmViewTest(APITestCase):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
+
         # Refresh user from database and activate
         self.user.refresh_from_db()
         self.user.is_active = True
         self.user.is_verified = True
         self.user.is_startup = True
         self.user.save()
-        
+
         login_response = self.client.post(
             '/api/auth/login/',
             {
