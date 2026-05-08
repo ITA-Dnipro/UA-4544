@@ -72,9 +72,14 @@ const LoginPage: React.FC = () => {
         return;
       }
 
+      if (!payload.access || !payload.refresh || !payload.user) {
+        setServerError("Unexpected server response. Please try again.");
+        return;
+      }
+
       login(payload.access, payload.refresh, payload.user);
       navigate("/");
-    } catch (err) {
+    } catch {
       setServerError("Server error occurred. Please try again.");
     } finally {
       setIsLoading(false);

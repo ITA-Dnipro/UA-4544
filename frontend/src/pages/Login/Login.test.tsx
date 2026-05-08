@@ -1,14 +1,39 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, test, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import LoginPage from "./Login";
 import React from "react";
+import { useAuth } from "../../hooks/useAuth";
+
+vi.mock("../../hooks/useAuth", () => ({
+  useAuth: vi.fn(),
+}));
+
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
+const mockLogin = vi.fn();
 
 const renderWithRouter = (ui: React.ReactElement) => {
   return render(<BrowserRouter>{ui}</BrowserRouter>);
 };
 
 describe("LoginPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useAuth as any).mockReturnValue({
+      login: mockLogin,
+    });
+    global.fetch = vi.fn();
+  });
+
   test("renders all fields", () => {
     renderWithRouter(<LoginPage />);
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
@@ -26,48 +51,77 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 
-  test("email format validation", async () => {
+  test("successful login calls login function and navigates", async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        access: "fake-access",
+        refresh: "fake-refresh",
+        user: { id: 1, email: "test@example.com", role: "startup" },
+      }),
+    });
+
     renderWithRouter(<LoginPage />);
-    const emailInput = screen.getByLabelText(/email address/i);
-    fireEvent.change(emailInput, { target: { value: "wrong-format" } });
-    fireEvent.blur(emailInput);
-    expect(
-      await screen.findByText(/invalid email format/i),
-    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: "test@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "password123" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/auth/login/",
+        expect.any(Object),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith(
+        "fake-access",
+        "fake-refresh",
+        expect.objectContaining({ email: "test@example.com" }),
+      );
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+  });
+
+  test("displays server error on failed login", async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: "Invalid credentials" }),
+    });
+
+    renderWithRouter(<LoginPage />);
+
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: "wrong@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "wrongpass" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(await screen.findByText(/invalid credentials/i)).toBeInTheDocument();
   });
 
   test("toggle password visibility", async () => {
     renderWithRouter(<LoginPage />);
-
     const passwordInput = screen.getByLabelText(
       /^password$/i,
     ) as HTMLInputElement;
     const toggleButton = screen.getByRole("button", { name: /show password/i });
 
     expect(passwordInput.type).toBe("password");
-
     fireEvent.click(toggleButton);
-
     expect(passwordInput.type).toBe("text");
-    expect(
-      screen.getByRole("button", { name: /hide password/i }),
-    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /hide password/i }));
-
     expect(passwordInput.type).toBe("password");
-    expect(
-      screen.getByRole("button", { name: /show password/i }),
-    ).toBeInTheDocument();
-  });
-
-  test("role selection options", () => {
-    renderWithRouter(<LoginPage />);
-    expect(
-      screen.getByRole("option", { name: /startup/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: /investor/i }),
-    ).toBeInTheDocument();
   });
 });

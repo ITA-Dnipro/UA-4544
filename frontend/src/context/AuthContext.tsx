@@ -15,6 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
+  isLoading: boolean;
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
 }
@@ -26,10 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const logout = useCallback(async () => {
     const refresh = localStorage.getItem("refresh_token");
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    setUser(null);
+    setAccessToken(null);
+    localStorage.removeItem("refresh_token");
     if (refresh) {
       await fetch("/api/auth/logout/", {
         method: "POST",
@@ -37,10 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         body: JSON.stringify({ refresh }),
       }).catch(() => {});
     }
-    setUser(null);
-    setAccessToken(null);
-    localStorage.removeItem("refresh_token");
-    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
   }, []);
 
   const scheduleRefresh = useCallback(
@@ -94,7 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const refresh = localStorage.getItem("refresh_token");
-    if (!refresh) return;
+    if (!refresh) {
+      setIsLoading(false);
+      return;
+    }
 
     fetch("/api/auth/refresh/", {
       method: "POST",
@@ -112,12 +117,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         });
         scheduleRefresh(refresh, data.access);
       })
-      .catch(logout);
+      .catch(logout)
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, [logout, scheduleRefresh]);
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, login, logout }}>
-      {children}
+    <AuthContext.Provider
+      value={{ user, accessToken, login, logout, isLoading }}
+    >
+      {isLoading ? (
+        <div className="flex h-screen items-center justify-center">
+          Loading...
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
