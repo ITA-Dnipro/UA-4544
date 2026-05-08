@@ -32,7 +32,7 @@ class SavedItemView(APIView):
         target_type = serializer.validated_data['target_type']
         target_id = serializer.validated_data['target_id']
 
-        if target_type == 'startup':
+        if target_type in ('startup', 'company'):
             get_object_or_404(StartupProfile, pk=target_id)
         elif target_type == 'project':
             get_object_or_404(Project, pk=target_id)

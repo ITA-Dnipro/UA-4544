@@ -35,7 +35,7 @@ class InvestorProfileUpdateSerializer(serializers.ModelSerializer):
 
 class SavedItemCreateSerializer(serializers.Serializer):
     target_type = serializers.ChoiceField(choices=['company', 'startup', 'project'])
-    target_id = serializers.CharField()
+    target_id = serializers.CharField(max_length=50)
 
 
 class SavedItemResponseSerializer(serializers.ModelSerializer):
