@@ -126,7 +126,7 @@ class ProjectAPITests(APITestCase):
         url = reverse('project-detail', kwargs={'pk': private_project.id})
 
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         stranger = User.objects.create_user(
             username='stranger_viewer', is_startup=False, email='s@v.com'
@@ -152,7 +152,7 @@ class ProjectAPITests(APITestCase):
         self.client.logout()
 
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unlisted_project_access_for_investor(self):
         project = Project.objects.create(
