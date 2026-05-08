@@ -366,7 +366,7 @@ class PasswordResetConfirmViewTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_missing_password_returns_400(self):
+    def test_missing_password_returns_422(self):
         """Test that missing password returns 422 (validation error)."""
         response = self.client.post(
             self.url,
