@@ -88,16 +88,32 @@ class PasswordResetRequestView(APIView):
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
+            display_name = (
+                user.first_name
+                or user.get_full_name().strip()
+                or user.username
+                or user.email.split('@')[0]
+            )
+            expiry_minutes = max(1, settings.PASSWORD_RESET_TIMEOUT // 60)
+            email_context = {
+                'user_name': display_name,
+                'reset_url': reset_url,
+                'expiry_minutes': expiry_minutes,
+            }
+
+            text_message = render_to_string('email/password_reset.txt', email_context)
+
             html_message = render_to_string(
                 'email/password_reset.html',
-                {'reset_url': reset_url},
+                email_context,
             )
 
             email_msg = EmailMultiAlternatives(
                 subject='Password Reset — Scalea',
-                body=f'Reset your password: {reset_url}',
+                body=text_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
+                reply_to=[settings.EMAIL_REPLY_TO]
             )
             email_msg.attach_alternative(html_message, 'text/html')
 

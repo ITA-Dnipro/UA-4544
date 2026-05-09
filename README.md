@@ -200,46 +200,48 @@ The password reset endpoint (`POST /api/auth/password-reset/`) implements a secu
 - Tracks: user, email, IP address, token sent status, timestamp
 - Enables security monitoring and abuse detection
 
-#### Email Template
+#### Email Delivery and Templates
 
-When a valid user requests a password reset, they receive an email containing:
+When a matching user requests a password reset, backend sends a multipart email:
 
-**Subject:** `Password Reset Request - Startup Gateway`
+- Subject: `Password Reset — Scalea`
+- Plain text template: `scalea/users/templates/email/password_reset.txt`
+- HTML template: `scalea/users/templates/email/password_reset.html`
 
-**Reset Link Format:**
+Template context variables:
+
+- `user_name`
+- `reset_url`
+- `expiry_minutes`
+
+Reset link format used in the email body:
+
 ```
-{protocol}://{domain}/reset-password?uid={uid}&token={token}
-
-Example:
-https://startup-gateway.com/reset-password?uid=MQ&token=c7g8h9-abc123def456
+{FRONTEND_URL}/reset-password/{uid}.{token}/
 ```
 
-**Link Parameters:**
-- `uid` - Base64-encoded user ID
-- `token` - Secure, time-limited reset token (valid for 1 hour)
+#### Email Configuration (Env)
 
-**Email Templates Location:**
-- Plain text: `templates/emails/password_reset.txt`
-- HTML: `templates/emails/password_reset.html`
+```dotenv
+FRONTEND_URL=http://localhost:5173
 
-#### Configuration
+# local dev (safe default)
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 
-**Settings (settings.py):**
-```python
-# Password reset token expiry (in seconds)
-PASSWORD_RESET_TIMEOUT = 3600  # 1 hour
+# staging/prod provider
+# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=example@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=example@gmail.com
 
-# Email configuration
-DEFAULT_FROM_EMAIL = 'no-reply@startup-gateway.com'
-SITE_NAME = 'Startup Gateway'
-FRONTEND_URL = 'http://localhost:5173'
+# optional
+# EMAIL_REPLY_TO=example@gmail.com
 
-# Throttling
-REST_FRAMEWORK = {
-    'DEFAULT_THROTTLE_RATES': {
-        'password_reset': '5/hour',
-    }
-}
+# seconds (default 300 = 5 minutes)
+PASSWORD_RESET_TIMEOUT=300
 ```
 
 #### Testing
