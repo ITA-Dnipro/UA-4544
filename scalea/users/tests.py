@@ -187,7 +187,9 @@ class PasswordResetRequestTests(APITestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
-        html_alternatives = [body for body, mime in sent.alternatives if mime == 'text/html']
+        html_alternatives = [
+            body for body, mime in sent.alternatives if mime == 'text/html'
+        ]
         self.assertTrue(html_alternatives, 'No HTML alternative found in email')
         self.assertIn('/reset-password/', html_alternatives[0])
 

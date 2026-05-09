@@ -113,7 +113,7 @@ class PasswordResetRequestView(APIView):
                 body=text_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
-                reply_to=[settings.EMAIL_REPLY_TO]
+                reply_to=[settings.EMAIL_REPLY_TO],
             )
             email_msg.attach_alternative(html_message, 'text/html')
 
