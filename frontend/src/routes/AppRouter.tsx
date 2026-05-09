@@ -9,6 +9,7 @@ import Inbox from "../pages/Inbox";
 import PasswordResetConfirm from "../pages/PasswordReset/PasswordResetConfirm";
 import PasswordResetRequest from "../pages/PasswordReset/PasswordResetRequest";
 import Search from "../pages/Search";
+import ProtectedRoute from "../components/ProtectedRoute/ProtectedRoute";
 
 export default function AppRouter() {
   return (
@@ -20,8 +21,22 @@ export default function AppRouter() {
         <Route path="/register" element={<Register />} />
         <Route path="/startups/:id" element={<StartupView />} />
         <Route path="/search" element={<Search />} />
-        <Route path="/dashboard" element={<InvestorDashboard />} />
-        <Route path="/messages" element={<Inbox />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <InvestorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <Inbox />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/password-reset" element={<PasswordResetRequest />} />
         <Route
           path="/reset-password/:token"
