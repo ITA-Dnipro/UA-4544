@@ -125,16 +125,27 @@ class PasswordResetConfirmView(APIView):
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
-        if not serializer.is_valid():
-            # Return 422 for password validation errors
-            if 'password' in serializer.errors:
+        serializer.is_valid()
+
+        # Separate validation errors: required/malformed (400) vs weak password (422)
+        errors = serializer.errors
+        if errors:
+            # Check if password errors are from validate_password() (weak password)
+            password_errors = errors.get('password', [])
+            is_weak_password = any(
+                error.code != 'required' and error.code != 'blank'
+                for error in password_errors
+            )
+
+            if is_weak_password:
+                # 422 for password complexity/validation errors only
                 return Response(
-                    serializer.errors,
+                    errors,
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
-            # Return 400 for other validation errors (uid, token)
+            # 400 for malformed requests (missing fields, invalid uid/token format)
             return Response(
-                serializer.errors,
+                errors,
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -144,9 +155,13 @@ class PasswordResetConfirmView(APIView):
 
         try:
             uid = force_str(urlsafe_base64_decode(uid_b64))
-            user = User.objects.filter(id=uid).first()
         except (ValueError, TypeError):
-            user = None
+            return Response(
+                {'detail': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(id=uid).first()
 
         if not user or not password_reset_token.check_token(user, token):
             return Response(

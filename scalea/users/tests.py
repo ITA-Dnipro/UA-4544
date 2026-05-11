@@ -156,7 +156,6 @@ class PasswordResetRequestTests(APITestCase):
         self.assertEqual(audit.user, self.user)
         self.assertEqual(audit.email, self.email)
         self.assertIsNotNone(audit.ip_address)
-        self.assertNotEqual(audit.user_agent, '')
 
     def test_audit_log_includes_user_agent(self):
         """Test that audit log captures user agent."""
@@ -366,8 +365,8 @@ class PasswordResetConfirmViewTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_missing_password_returns_422(self):
-        """Test that missing password returns 422 (validation error)."""
+    def test_missing_password_returns_400(self):
+        """Test that missing password returns 400 (malformed request)."""
         response = self.client.post(
             self.url,
             {
@@ -375,7 +374,7 @@ class PasswordResetConfirmViewTest(APITestCase):
                 'token': self.token,
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_token_single_use_enforced_by_expiry(self):
         """Test that used token cannot be reused (enforced by token generator)."""
