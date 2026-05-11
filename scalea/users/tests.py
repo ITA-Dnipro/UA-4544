@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 from unittest.mock import patch
 
 import requests as req_lib
@@ -8,6 +9,7 @@ from django.core.cache import cache
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from investors.models import InvestorProfile
@@ -18,9 +20,7 @@ from startups.models import StartupProfile
 
 from users.tokens import password_reset_token
 
-from .models import PasswordResetAudit
-
-User = get_user_model()
+from .models import PasswordResetAudit, User
 
 
 class UserModelTests(TestCase):
@@ -304,6 +304,13 @@ class PasswordResetConfirmViewTest(APITestCase):
         self.combined_token = f'{self.uid}.{self.token}'
         self.url = '/api/auth/password-reset/confirm/'
 
+        PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(self.token),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
     def test_valid_token_changes_password(self):
         response = self.client.post(
             self.url,
@@ -319,13 +326,15 @@ class PasswordResetConfirmViewTest(APITestCase):
     def test_password_reset_revokes_existing_refresh_tokens(self):
         refresh = str(RefreshToken.for_user(self.user))
 
-        self.client.post(
+        reset_response = self.client.post(
             self.url,
             {
                 'token': self.combined_token,
                 'password': 'NewP@ssword1',
             },
         )
+        self.assertEqual(reset_response.status_code, status.HTTP_200_OK)
+
         refresh_response = self.client.post(
             '/api/auth/refresh/',
             {'refresh': refresh},
@@ -701,3 +710,112 @@ class RegisterSecurityTests(APITestCase):
         cache.delete('throttle_register_127.0.0.1')
         response = self.client.post(self.url, other_data, format='json')
         self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class PasswordResetTokenLifecycleTests(APITestCase):
+    """TDD: these tests define the expected lifecycle behaviour.
+    They will fail until the model, views and admin are implemented."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='lifecycle@example.com',
+            email='lifecycle@example.com',
+            password='OldP@ssword1',
+        )
+        self.request_url = '/api/auth/password-reset/'
+        self.confirm_url = '/api/auth/password-reset/confirm/'
+
+        self.combined_token = self._issue_token_record()
+
+    def _issue_token_record(self):
+        raw = password_reset_token.make_token(self.user)
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        record = PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(raw),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+        return record, f'{uid}.{raw}'
+
+    def test_token_can_be_used_once(self):
+        _record, combined = self._issue_token_record()
+
+        first = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+        second = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'AnotherP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_successful_confirm_marks_token_used(self):
+        record, combined = self._issue_token_record()
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        record.refresh_from_db()
+        self.assertIsNotNone(record.used_at)
+
+    def test_revoked_token_fails_confirm(self):
+        record, combined = self._issue_token_record()
+        record.revoked = True
+        record.save(update_fields=['revoked'])
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expired_token_fails_confirm(self):
+        record, combined = self._issue_token_record()
+        record.expires_at = timezone.now() - timedelta(seconds=1)
+        record.save(update_fields=['expires_at'])
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('users.views.EmailMultiAlternatives.send')
+    @patch(
+        'rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True
+    )
+    def test_new_request_revokes_previous_active_tokens(
+        self, _mock_throttle, _mock_send
+    ):
+        old_raw = password_reset_token.make_token(self.user)
+        old_record = PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(old_raw),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            self.request_url,
+            {'email': self.user.email},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        old_record.refresh_from_db()
+        self.assertTrue(old_record.revoked)

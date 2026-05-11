@@ -11,6 +11,7 @@ from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from investors.models import InvestorProfile
@@ -37,6 +38,11 @@ from startups.serializers import (
     StartupPublicProfileSerializer,
 )
 
+from .metrics import (
+    inc_reset_confirm,
+    inc_reset_expired_attempt,
+    inc_reset_reused_attempt,
+)
 from .models import PasswordResetAudit
 from .security import (
     clear_login_failures,
@@ -79,15 +85,34 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-        user = User.objects.filter(email=email).first()
-
-        PasswordResetAudit.objects.create(
-            user=user, email=email, ip_address=get_client_ip(request)
+        audit = PasswordResetAudit.objects.create(
+            user=None, email=email, ip_address=get_client_ip(request)
         )
+
+        user = User.objects.filter(email=email).first()
 
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token_hash = PasswordResetAudit.hash_token(token)
+            expires_at = timezone.now() + timedelta(
+                seconds=settings.PASSWORD_RESET_TIMEOUT
+            )
+
+            with transaction.atomic():
+                # Lock existing active audits for this user before revoking
+                PasswordResetAudit.objects.select_for_update().filter(
+                    user=user,
+                    revoked=False,
+                    used_at__isnull=True,
+                    token_hash__isnull=False,
+                ).exclude(pk=audit.pk).update(revoked=True)
+
+                audit.user = user
+                audit.token_hash = token_hash
+                audit.expires_at = expires_at
+                audit.save(update_fields=['user', 'token_hash', 'expires_at'])
+
             combined_token = f'{uid}.{token}'
             reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
 
@@ -165,13 +190,41 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        audit_record = PasswordResetAudit.objects.filter(
+            user=user,
+            token_hash=PasswordResetAudit.hash_token(token),
+        ).first()
+
+        if not audit_record:
+            inc_reset_reused_attempt()
+            return Response(
+                {'detail': 'Invalid or expired token'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if audit_record.is_expired:
+            inc_reset_expired_attempt()
+            return Response(
+                {'detail': 'Invalid or expired token'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not audit_record.is_active:
+            inc_reset_reused_attempt()
+            return Response(
+                {'detail': 'Invalid or expired token'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
             user.set_password(password)
             user.save()
+            audit_record.mark_used()
 
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
+        inc_reset_confirm()
         logger.info('Password reset successful for user ID: %s', user.pk)
 
         return Response(
