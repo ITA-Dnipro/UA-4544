@@ -1,17 +1,20 @@
+import re
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-from investors.models import InvestorProfile
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-from startups.models import StartupProfile
 
+from investors.models import InvestorProfile
+from startups.models import StartupProfile
 from users.tokens import password_reset_token
 
 from .models import PasswordResetAudit
@@ -148,6 +151,91 @@ class PasswordResetRequestTests(APITestCase):
 
         response = self.client.post(self.url, {'email': self.email})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_email_sent_to_correct_address(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.email])
+
+    def test_email_body_contains_reset_url(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        self.assertIn('/reset-password/', mail.outbox[0].body)
+
+    def test_email_reset_url_has_combined_token_format(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        match = re.search(r'/reset-password/([^/]+)/', mail.outbox[0].body)
+        self.assertIsNotNone(match)
+        self.assertIn('.', match.group(1))
+
+    def test_email_reset_token_is_valid(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        match = re.search(r'/reset-password/([^/]+)/', mail.outbox[0].body)
+        uid_b64, token_part = match.group(1).split('.', 1)
+        uid = force_str(urlsafe_base64_decode(uid_b64))
+        self.assertEqual(str(self.user.pk), uid)
+        self.assertTrue(password_reset_token.check_token(self.user, token_part))
+
+    def test_email_has_html_alternative(self):
+        """Email contains an HTML alternative part."""
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        sent = mail.outbox[0]
+        html_bodies = [body for body, mime in sent.alternatives if mime == 'text/html']
+        self.assertTrue(html_bodies, 'No HTML alternative found in email')
+
+    def test_email_omits_reply_to_when_setting_is_empty(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+            EMAIL_REPLY_TO='',
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        self.assertEqual(mail.outbox[0].reply_to, [])
+
+    def test_email_omits_reply_to_when_setting_is_whitespace(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+            EMAIL_REPLY_TO='   ',
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        self.assertEqual(mail.outbox[0].reply_to, [])
+
+    def test_email_includes_reply_to_when_setting_is_present(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+            EMAIL_REPLY_TO='support@example.com',
+        ):
+            self.client.post(self.url, {'email': self.email})
+
+        self.assertEqual(mail.outbox[0].reply_to, ['support@example.com'])
+
+    def test_no_email_sent_for_unknown_user(self):
+        with override_settings(
+            EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+        ):
+            self.client.post(self.url, {'email': 'nobody@example.com'})
+
+        self.assertEqual(len(mail.outbox), 0)
 
 
 class PasswordResetConfirmViewTest(APITestCase):
