@@ -153,6 +153,7 @@ class PasswordResetConfirmView(APIView):
         token = serializer.validated_data['token']
         password = serializer.validated_data['password']
 
+        # Decode UID separately - handles base64 decoding errors
         try:
             uid = force_str(urlsafe_base64_decode(uid_b64))
         except (ValueError, TypeError):
@@ -161,9 +162,17 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = User.objects.filter(id=uid).first()
+        # Lookup user separately - handles non-existent user
+        try:
+            user = User.objects.get(id=uid)
+        except (User.DoesNotExist, ValueError):
+            return Response(
+                {'detail': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if not user or not password_reset_token.check_token(user, token):
+        # Validate token
+        if not password_reset_token.check_token(user, token):
             return Response(
                 {'detail': 'Invalid or expired token.'},
                 status=status.HTTP_400_BAD_REQUEST,
