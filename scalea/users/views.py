@@ -12,11 +12,6 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from investors.models import InvestorProfile
-from investors.serializers import (
-    InvestorProfileUpdateSerializer,
-    InvestorPublicProfileSerializer,
-)
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, AllowAny
@@ -29,6 +24,12 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
@@ -108,13 +109,19 @@ class PasswordResetRequestView(APIView):
                 email_context,
             )
 
-            email_msg = EmailMultiAlternatives(
-                subject='Password Reset — Scalea',
-                body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[user.email],
-                reply_to=[settings.EMAIL_REPLY_TO],
+            reply_to = (
+                settings.EMAIL_REPLY_TO.strip() if settings.EMAIL_REPLY_TO else ''
             )
+            email_kwargs = {
+                'subject': 'Password Reset — Scalea',
+                'body': text_message,
+                'from_email': settings.DEFAULT_FROM_EMAIL,
+                'to': [user.email],
+            }
+            if reply_to:
+                email_kwargs['reply_to'] = [reply_to]
+
+            email_msg = EmailMultiAlternatives(**email_kwargs)
             email_msg.attach_alternative(html_message, 'text/html')
 
             try:
