@@ -20,5 +20,5 @@ def decode_email_verification_token(token, max_age=settings.EMAIL_VERIFICATION_M
             salt=settings.EMAIL_VERIFICATION_SALT,
             max_age=max_age,
         )
-    except signing.BadSignature:
+    except (signing.BadSignature, signing.SignatureExpired):
         return None
