@@ -8,6 +8,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from startups.models import StartupProfile
 
+from users.services import send_email_verification
+
 User = get_user_model()
 
 
@@ -90,17 +92,10 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
     def send_verification_email(self, user):
-        # TODO(i-taras): Implement actual SMTP dispatch & activation token logic [#99]
-        # Users will be LOCKED OUT until this method is implemented
-        # and the activation endpoint is ready.
-        # This is a placeholder to allow the registration schema to merge.
-        pass
+        send_email_verification(user)
 
-    def send_already_registered_email(self, user):
-        # TODO(i-taras): Implement resend logic for verification emails [#99]
-        # This is a placeholder to allow the registration schema to merge and
-        # NO email is actually dispatched.
-        pass
+    def send_already_registered_email(self, _user):
+        return
 
 
 class LoginSerializer(serializers.Serializer):
@@ -154,3 +149,15 @@ class LogoutSerializer(serializers.Serializer):
 
     def save(self):
         self.validated_data['token_obj'].blacklist()
+
+
+class EmailVerificationSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True, allow_blank=False)
+
+
+class ResendVerificationEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField(write_only=True)
+
+    def validate_email(self, value):
+        normalized_email = User.objects.normalize_email(value)
+        return normalized_email.lower()

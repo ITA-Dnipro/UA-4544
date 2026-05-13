@@ -179,6 +179,7 @@ REST_FRAMEWORK = {
         'refresh': '10/minute',
         'logout': '10/minute',
         'password_reset': '5/hour',
+        'resend_verification_email': '1/minute',
     },
 }
 
@@ -189,6 +190,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,
     'UPDATE_LAST_LOGIN': True,
 }
+
 
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
@@ -205,3 +207,9 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 EMAIL_REPLY_TO = config('EMAIL_REPLY_TO', default=DEFAULT_FROM_EMAIL)
 PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=300, cast=int)
+EMAIL_VERIFICATION_SALT = config(
+    'EMAIL_VERIFICATION_SALT', default='email-verification'
+)
+EMAIL_VERIFICATION_MAX_AGE = config(
+    'EMAIL_VERIFICATION_MAX_AGE', default=60 * 60 * 24, cast=int
+)

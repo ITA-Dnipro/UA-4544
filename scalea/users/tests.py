@@ -9,13 +9,14 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from investors.models import InvestorProfile
 from startups.models import StartupProfile
-from users.tokens import password_reset_token
+
+from users.models import User
+from users.tokens import get_email_verification_token, password_reset_token
 
 from .models import PasswordResetAudit
 
@@ -520,3 +521,76 @@ class RefreshAndLogoutApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('detail', response.data)
+
+
+class EmailVerificationTests(APITestCase):
+    verify_url = '/api/auth/verify-email/'
+    resend_url = '/api/auth/resend-verification/'
+
+    def test_successful_email_verification(self):
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='123qwe!@#',
+            is_active=False,
+            is_verified=False,
+        )
+        token = get_email_verification_token(user)
+        response = self.client.post(self.verify_url, {'token': token}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertTrue(user.is_verified)
+        self.assertTrue(user.is_active)
+        self.assertEqual(
+            response.json()['detail'],
+            'Email verified successfully.',
+        )
+
+    def test_email_verification_with_invalid_token(self):
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='123qwe!@#',
+            is_active=False,
+            is_verified=False,
+        )
+
+        response = self.client.post(
+            self.verify_url,
+            {'token': 'invalid-token'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+        user.refresh_from_db()
+
+        self.assertFalse(user.is_verified)
+        self.assertFalse(user.is_active)
+        self.assertEqual(
+            response.json()['detail'],
+            'Invalid or expired token.',
+        )
+
+    @patch('users.services.send_mail')
+    def test_resend_verification_for_unverified_user(self, mock_send_mail):
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='123qwe!@#',
+            is_active=False,
+            is_verified=False,
+        )
+
+        response = self.client.post(
+            self.resend_url,
+            {'email': user.email},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()['detail'],
+            'If an account with that email exists, a verification email has been sent.',
+        )
+        mock_send_mail.assert_called_once()
