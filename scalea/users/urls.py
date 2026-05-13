@@ -7,6 +7,8 @@ from .views import (
     PasswordResetRequestView,
     RefreshView,
     RegisterView,
+    ResendVerificationEmailView,
+    VerifyEmailView,
 )
 
 urlpatterns = [
@@ -20,4 +22,10 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='auth-login'),
     path('refresh/', RefreshView.as_view(), name='token-refresh'),
     path('logout/', LogoutView.as_view(), name='auth-logout'),
+    path('verify-email/', VerifyEmailView.as_view(), name='verify-email'),
+    path(
+        'resend-verification/',
+        ResendVerificationEmailView.as_view(),
+        name='resend-verification',
+    ),
 ]
