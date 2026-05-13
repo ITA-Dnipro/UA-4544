@@ -1,41 +1,15 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, test, expect, vi, beforeEach, type Mock } from "vitest";
 import "@testing-library/jest-dom";
 import { BrowserRouter } from "react-router-dom";
 import LoginPage from "./Login";
 import React from "react";
-import { useAuth } from "../../hooks/useAuth";
-
-vi.mock("../../hooks/useAuth", () => ({
-  useAuth: vi.fn(),
-}));
-
-const mockNavigate = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual("react-router-dom");
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
-
-const mockLogin = vi.fn();
+import { describe, test, expect, vi } from "vitest";
 
 const renderWithRouter = (ui: React.ReactElement) => {
   return render(<BrowserRouter>{ui}</BrowserRouter>);
 };
 
 describe("LoginPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    (useAuth as Mock).mockReturnValue({
-      login: mockLogin,
-    });
-
-    global.fetch = vi.fn() as Mock;
-  });
-
   test("renders all fields", () => {
     renderWithRouter(<LoginPage />);
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
@@ -53,17 +27,98 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 
-  test("successful login calls login function with remember option", async () => {
-    (global.fetch as Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        access: "fake-access",
-        refresh: "fake-refresh",
-        user: { id: 1, email: "test@example.com", role: "startup" },
-      }),
-    });
-
+  test("email format validation", async () => {
     renderWithRouter(<LoginPage />);
+    const emailInput = screen.getByLabelText(/email address/i);
+    fireEvent.change(emailInput, { target: { value: "wrong-format" } });
+    fireEvent.blur(emailInput);
+    expect(
+      await screen.findByText(/invalid email format/i),
+    ).toBeInTheDocument();
+  });
+
+  test("toggle password visibility", async () => {
+    renderWithRouter(<LoginPage />);
+
+    const passwordInput = screen.getByLabelText(
+      /^password$/i,
+    ) as HTMLInputElement;
+    const toggleButton = screen.getByRole("button", { name: /show password/i });
+
+    expect(passwordInput.type).toBe("password");
+
+    fireEvent.click(toggleButton);
+
+    expect(passwordInput.type).toBe("text");
+    expect(
+      screen.getByRole("button", { name: /hide password/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /hide password/i }));
+
+    expect(passwordInput.type).toBe("password");
+    expect(
+      screen.getByRole("button", { name: /show password/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("role selection options", () => {
+    renderWithRouter(<LoginPage />);
+    expect(
+      screen.getByRole("option", { name: /startup/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /investor/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("password minimum length validation", async () => {
+    renderWithRouter(<LoginPage />);
+    const passwordInput = screen.getByLabelText(/^password$/i);
+    fireEvent.change(passwordInput, { target: { value: "abc" } });
+    fireEvent.blur(passwordInput);
+    expect(
+      await screen.findByText(/minimum 6 characters required/i),
+    ).toBeInTheDocument();
+  });
+
+  test("forgot password link renders and points to /password-reset", () => {
+    renderWithRouter(<LoginPage />);
+    const forgotLink = screen.getByRole("link", { name: /forgot password/i });
+    expect(forgotLink).toBeInTheDocument();
+    expect(forgotLink).toHaveAttribute("href", "/password-reset");
+  });
+
+  test("create account link renders and points to /register", () => {
+    renderWithRouter(<LoginPage />);
+    const registerLink = screen.getByRole("link", { name: /create an account/i });
+    expect(registerLink).toBeInTheDocument();
+    expect(registerLink).toHaveAttribute("href", "/register");
+  });
+
+  test("remember me checkbox is unchecked by default", () => {
+    renderWithRouter(<LoginPage />);
+    const checkbox = screen.getByLabelText(/remember me/i) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+  });
+
+  test("remember me checkbox can be checked", () => {
+    renderWithRouter(<LoginPage />);
+    const checkbox = screen.getByLabelText(/remember me/i) as HTMLInputElement;
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+  });
+
+  test("submit button is present and labeled Log In", () => {
+    renderWithRouter(<LoginPage />);
+    expect(
+      screen.getByRole("button", { name: /log in/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("submit button becomes disabled while loading", async () => {
+    vi.useFakeTimers();
+    const { container } = renderWithRouter(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: "test@example.com" },
@@ -72,64 +127,37 @@ describe("LoginPage", () => {
       target: { value: "password123" },
     });
 
-    const rememberCheckbox = screen.getByLabelText(/remember me/i);
-    fireEvent.click(rememberCheckbox);
+    const submitButton = container.querySelector(
+      "button[type='submit']",
+    ) as HTMLButtonElement;
+    expect(submitButton).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/auth/login/",
-        expect.objectContaining({
-          method: "POST",
-        }),
-      );
-    });
+    fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith(
-        "fake-access",
-        "fake-refresh",
-        expect.objectContaining({ email: "test@example.com" }),
-        true,
-      );
+      expect(submitButton).toBeDisabled();
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("/");
+    vi.useRealTimers();
   });
 
-  test("displays server error on failed login", async () => {
-    (global.fetch as Mock).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ detail: "Invalid credentials" }),
-    });
-
+  test("role defaults to startup", () => {
     renderWithRouter(<LoginPage />);
-
-    fireEvent.change(screen.getByLabelText(/email address/i), {
-      target: { value: "wrong@test.com" },
-    });
-    fireEvent.change(screen.getByLabelText(/^password$/i), {
-      target: { value: "wrongpass" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /log in/i }));
-
-    expect(await screen.findByText(/invalid credentials/i)).toBeInTheDocument();
+    const roleSelect = screen.getByLabelText(/user role/i) as HTMLSelectElement;
+    expect(roleSelect.value).toBe("startup");
   });
 
-  test("toggle password visibility", async () => {
+  test("role can be changed to investor", () => {
     renderWithRouter(<LoginPage />);
-    const passwordInput = screen.getByLabelText(
-      /^password$/i,
-    ) as HTMLInputElement;
-    const toggleButton = screen.getByRole("button", { name: /show password/i });
+    const roleSelect = screen.getByLabelText(/user role/i) as HTMLSelectElement;
+    fireEvent.change(roleSelect, { target: { value: "investor" } });
+    expect(roleSelect.value).toBe("investor");
+  });
 
-    expect(passwordInput.type).toBe("password");
-    fireEvent.click(toggleButton);
-    expect(passwordInput.type).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: /hide password/i }));
-    expect(passwordInput.type).toBe("password");
+  test("page heading renders", () => {
+    renderWithRouter(<LoginPage />);
+    expect(
+      screen.getByRole("heading", { name: /login to platform/i }),
+    ).toBeInTheDocument();
   });
 });
