@@ -2,6 +2,8 @@ import hashlib
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
 
@@ -68,3 +70,33 @@ class PasswordResetAudit(models.Model):
 
     def __str__(self):
         return f'Reset requested for {self.email} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
+
+
+class ProfileAudit(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    profile = GenericForeignKey('content_type', 'object_id')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='profile_audits',
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    changes = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(
+                fields=['content_type', 'object_id', '-timestamp'],
+                name='profile_audit_target_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f'ProfileAudit(profile={self.content_type_id}:{self.object_id}, '
+            f'user={self.user_id}, ts={self.timestamp})'
+        )
