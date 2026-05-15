@@ -1,4 +1,5 @@
 # UA-4544
+
 ![CI Status](https://github.com/ITA-Dnipro/UA-4544/actions/workflows/ci.yml/badge.svg)
 ![Codecov](https://codecov.io/gh/ITA-Dnipro/UA-4544/branch/develop/graph/badge.svg)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
