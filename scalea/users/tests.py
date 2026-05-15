@@ -9,12 +9,12 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from investors.models import InvestorProfile
 from startups.models import StartupProfile
+
 from users.tokens import password_reset_token
 
 from .models import PasswordResetAudit
@@ -117,6 +117,57 @@ class RegistrationAPITests(TestCase):
 
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_registration_same_email_can_add_second_role(self):
+        password = 'StrongPassword123!'
+
+        first_response = self.client.post(
+            self.url,
+            {
+                'email': 'multirole@example.com',
+                'password': password,
+                'role': 'startup',
+                'company_name': 'Role One',
+            },
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+
+        second_response = self.client.post(
+            self.url,
+            {
+                'email': 'multirole@example.com',
+                'password': password,
+                'role': 'investor',
+                'bio': 'Role two profile',
+            },
+        )
+        self.assertEqual(second_response.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(email='multirole@example.com')
+        self.assertTrue(user.is_startup)
+        self.assertTrue(user.is_investor)
+
+    def test_registration_same_role_twice_returns_400(self):
+        existing_password = 'StrongPassword123!'
+        self.client.post(
+            self.url,
+            {
+                'email': 'startup-role@example.com',
+                'password': existing_password,
+                'role': 'startup',
+            },
+        )
+
+        response = self.client.post(
+            self.url,
+            {
+                'email': 'startup-role@example.com',
+                'password': existing_password,
+                'role': 'startup',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('role', response.data)
 
 
 class PasswordResetRequestTests(APITestCase):
@@ -334,6 +385,27 @@ class TestLoginApi(APITestCase):
         self.assertEqual(res.data['user']['email'], self.email)
         self.assertEqual(res.data['user']['role'], 'startup')
 
+    def test_unverified_org_admin_login_returns_403_pending_approval(self):
+        self.user.is_org_admin = True
+        self.user.is_verified = False
+        self.user.save(update_fields=['is_org_admin', 'is_verified'])
+
+        res = self.client.post(
+            self.url,
+            {
+                'email': self.email,
+                'password': self.password,
+                'role': 'org_admin',
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            res.data.get('detail'),
+            'Your administrative account is pending approval.',
+        )
+
     def test_wrong_password_returns_401_generic(self):
         res = self.client.post(
             self.url,
@@ -520,3 +592,37 @@ class RefreshAndLogoutApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('detail', response.data)
+
+    def test_logout_startup_session_still_allows_login_as_investor(self):
+        same_password = self.password
+        register_url = reverse('register')
+
+        register_response = self.client.post(
+            register_url,
+            {
+                'email': self.user.email,
+                'password': same_password,
+                'role': 'investor',
+                'bio': 'Investor role profile',
+            },
+            format='json',
+        )
+        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
+
+        logout_response = self.client.post(
+            self.logout_url,
+            {'refresh': self.refresh_token},
+            format='json',
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+
+        investor_login_response = self.client.post(
+            reverse('auth-login'),
+            {
+                'email': self.user.email,
+                'password': same_password,
+                'role': 'investor',
+            },
+            format='json',
+        )
+        self.assertEqual(investor_login_response.status_code, status.HTTP_200_OK)

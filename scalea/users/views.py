@@ -12,6 +12,11 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, AllowAny
@@ -24,12 +29,6 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-
-from investors.models import InvestorProfile
-from investors.serializers import (
-    InvestorProfileUpdateSerializer,
-    InvestorPublicProfileSerializer,
-)
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
@@ -222,6 +221,13 @@ class LoginView(APIView):
 
         user = serializer.validated_data['user']
         remember = serializer.validated_data['remember']
+        role = serializer.validated_data.get('role')
+
+        if role == 'org_admin' and not user.is_verified:
+            return Response(
+                {'detail': 'Your administrative account is pending approval.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         clear_failures(email)
 
@@ -239,7 +245,7 @@ class LoginView(APIView):
                 'user': {
                     'id': user.id,
                     'email': user.email,
-                    'role': serializer.validated_data.get('role'),
+                    'role': role,
                 },
             },
             status=status.HTTP_200_OK,
