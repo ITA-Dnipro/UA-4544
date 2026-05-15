@@ -59,6 +59,10 @@ class RegisterSerializer(serializers.Serializer):
         user = User.objects.filter(email=email).first()
 
         if user:
+            if not user.check_password(password):
+                self.send_already_registered_email(user)
+                return user
+
             if (
                 (role == 'startup' and user.is_startup)
                 or (role == 'investor' and user.is_investor)
@@ -67,10 +71,6 @@ class RegisterSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {'role': f'You already have a {role} profile.'}
                 )
-
-            if not user.check_password(password):
-                self.send_already_registered_email(user)
-                return user
 
             if role == 'startup':
                 user.is_startup = True
@@ -151,6 +151,12 @@ class LoginSerializer(serializers.Serializer):
                 code='authorization',
             )
 
+        if not user.check_password(password):
+            raise serializers.ValidationError(
+                {'detail': 'Invalid email or password.'},
+                code='authorization',
+            )
+
         role_check = {
             'startup': user.is_startup,
             'investor': user.is_investor,
@@ -158,10 +164,6 @@ class LoginSerializer(serializers.Serializer):
         }
 
         if not role_check.get(requested_role):
-            raise serializers.ValidationError(
-                {'detail': f'Your account does not have {requested_role} permissions.'}
-            )
-        if not user.check_password(password):
             raise serializers.ValidationError(
                 {'detail': 'Invalid email or password.'},
                 code='authorization',

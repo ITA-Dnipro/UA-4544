@@ -148,11 +148,12 @@ class RegistrationAPITests(TestCase):
         self.assertTrue(user.is_investor)
 
     def test_registration_same_role_twice_returns_400(self):
+        existing_password = 'StrongPassword123!'
         self.client.post(
             self.url,
             {
                 'email': 'startup-role@example.com',
-                'password': 'StrongPassword123!',
+                'password': existing_password,
                 'role': 'startup',
             },
         )
@@ -161,7 +162,7 @@ class RegistrationAPITests(TestCase):
             self.url,
             {
                 'email': 'startup-role@example.com',
-                'password': 'AnotherStrongPass123!',
+                'password': existing_password,
                 'role': 'startup',
             },
         )
