@@ -401,6 +401,34 @@ To enable coverage upload:
 * **Python** (pip)
 * **Frontend** (npm packages)
 
+### AI Code Review (CodeRabbit)
+
+This project uses **CodeRabbit** for AI-powered pull request reviews.
+
+Auto-review is **disabled** by default — reviews must be triggered manually.
+
+#### How to trigger a review
+
+Write this comment on any pull request:
+
+```
+@coderabbitai review
+```
+
+#### Useful commands
+
+| Command | What it does |
+|---|---|
+| `@coderabbitai review` | Full AI review of the PR |
+| `@coderabbitai summary` | Generate PR summary only |
+| `@coderabbitai resolve` | Resolve all open CodeRabbit comments |
+
+#### Configuration
+
+CodeRabbit behavior is configured in `.coderabbit.yaml` in the repo root.
+Profile is set to `chill` — focuses on security and logic issues only.
+
+
 #### Step 1: Installation
 
 **Action**: All dependencies can be installed with a single pip command ran from the project root.
