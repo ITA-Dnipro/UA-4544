@@ -1,0 +1,19 @@
+language: "en"
+tone_instructions: "Focus on security, logic errors, and correctness. Skip style and formatting nitpicks."
+
+reviews:
+  profile: "chill"
+  auto_review:
+    enabled: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  path_filters:
+    - "!**/migrations/**"
+    - "!**/fixtures/**"
+    - "!frontend/dist/**"
+    - "!frontend/node_modules/**"
+    - "!scalea.egg-info/**"
+
+chat:
+  auto_reply: true
