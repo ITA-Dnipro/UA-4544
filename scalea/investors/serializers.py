@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from projects.models import Project, ProjectVisibility
+from projects.models import Project
+from projects.permissions import ProjectVisibilityPermission
 from startups.models import StartupProfile
 
 from .models import InvestorProfile, SavedItem
@@ -50,6 +51,8 @@ class SavedItemResponseSerializer(serializers.ModelSerializer):
 
 
 class SavedItemCardSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    saved_id = serializers.IntegerField(source='id', read_only=True)
     type = serializers.CharField(source='target_type')
     title = serializers.SerializerMethodField()
     slug = serializers.SerializerMethodField()
@@ -63,6 +66,7 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
         model = SavedItem
         fields = [
             'id',
+            'saved_id',
             'type',
             'title',
             'slug',
@@ -73,6 +77,9 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
             'is_available',
             'unavailable_reason',
         ]
+
+    def get_id(self, obj):
+        return str(obj.target_id)
 
     def get_target_obj(self, obj):
         if hasattr(obj, '_cached_target_obj'):
@@ -85,7 +92,7 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
 
         elif obj.target_type == 'project':
             obj._cached_target_obj = (
-                Project.objects.select_related('startup')
+                Project.objects.select_related('startup', 'startup__user')
                 .filter(pk=obj.target_id)
                 .first()
             )
@@ -96,15 +103,30 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
         return obj._cached_target_obj
 
     def _can_view(self, obj):
+        if hasattr(obj, '_cached_can_view'):
+            return obj._cached_can_view
+
         target = self.get_target_obj(obj)
 
         if target is None:
-            return False
+            obj._cached_can_view = False
+            return obj._cached_can_view
 
         if obj.target_type == 'project':
-            return target.visibility == ProjectVisibility.PUBLIC
+            request = self.context.get('request')
 
-        return obj.target_type in ('startup', 'company')
+            obj._cached_can_view = (
+                request is not None
+                and ProjectVisibilityPermission().has_object_permission(
+                    request,
+                    None,
+                    target,
+                )
+            )
+            return obj._cached_can_view
+
+        obj._cached_can_view = obj.target_type in ('startup', 'company')
+        return obj._cached_can_view
 
     def get_is_available(self, obj):
         return self._can_view(obj)
@@ -115,26 +137,14 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
 
         target = self.get_target_obj(obj)
 
-        if obj.target_type == 'project':
-            if target is None:
-                return 'This project is no longer available.'
+        if target is None:
+            return 'This item is no longer available.'
 
-            if target.visibility == ProjectVisibility.PRIVATE:
-                return 'This project is private.'
-
-            if target.visibility == ProjectVisibility.UNLISTED:
-                return 'This project is unlisted and not available.'
-
-            return 'This project is no longer available.'
-
-        if obj.target_type in ('startup', 'company'):
-            return 'This startup is no longer available.'
-
-        return 'This item is no longer available.'
+        return 'This item is currently unavailable.'
 
     def get_title(self, obj):
-        if obj.target_type == 'project' and not self._can_view(obj):
-            return 'Unavailable project'
+        if not self._can_view(obj):
+            return None
 
         target = self.get_target_obj(obj)
 
@@ -147,7 +157,7 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
         return target.company_name
 
     def get_slug(self, obj):
-        if obj.target_type == 'project' and not self._can_view(obj):
+        if not self._can_view(obj):
             return None
 
         target = self.get_target_obj(obj)
@@ -158,7 +168,7 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
         return getattr(target, 'slug', None)
 
     def get_thumbnail_url(self, obj):
-        if obj.target_type == 'project' and not self._can_view(obj):
+        if not self._can_view(obj):
             return None
 
         target = self.get_target_obj(obj)
@@ -167,12 +177,12 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
             return None
 
         if obj.target_type == 'project':
-            return getattr(target.startup, 'logo_url', None)
+            return None
 
         return getattr(target, 'logo_url', None)
 
     def get_short_description(self, obj):
-        if obj.target_type == 'project' and not self._can_view(obj):
+        if not self._can_view(obj):
             return None
 
         target = self.get_target_obj(obj)
@@ -183,7 +193,7 @@ class SavedItemCardSerializer(serializers.ModelSerializer):
         return getattr(target, 'short_description', None)
 
     def get_tags(self, obj):
-        if obj.target_type == 'project' and not self._can_view(obj):
+        if not self._can_view(obj):
             return []
 
         target = self.get_target_obj(obj)
