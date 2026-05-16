@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.test import TestCase
 from investors.models import InvestorProfile
 from projects.models import Project
@@ -19,6 +18,7 @@ from tracking.models import (
 
 User = get_user_model()
 
+
 class TrackingModelTests(TestCase):
     def setUp(self):
         investor_user = User.objects.create_user(
@@ -31,10 +31,14 @@ class TrackingModelTests(TestCase):
             username='startup_user1',
             email='startup@example.com',
             password='pass',
-        )        
+        )
 
-        investor = InvestorProfile.objects.create(user=investor_user, company_name='Acme Capital')
-        startup = StartupProfile.objects.create(user=startup_user, company_name='Test Startup')
+        investor = InvestorProfile.objects.create(
+            user=investor_user, company_name='Acme Capital'
+        )
+        startup = StartupProfile.objects.create(
+            user=startup_user, company_name='Test Startup'
+        )
         project = Project.objects.create(
             title='Test Project', startup=startup, target_amount=Decimal('100000.0')
         )
@@ -141,10 +145,14 @@ class InvestmentModelTests(TestCase):
             username='startup_user1',
             email='startup@example.com',
             password='pass',
-        )        
+        )
 
-        investor = InvestorProfile.objects.create(user=investor_user, company_name='Acme Capital')
-        startup = StartupProfile.objects.create(user=startup_user, company_name='Test Startup')
+        investor = InvestorProfile.objects.create(
+            user=investor_user, company_name='Acme Capital'
+        )
+        startup = StartupProfile.objects.create(
+            user=startup_user, company_name='Test Startup'
+        )
         project = Project.objects.create(
             title='Test Project', startup=startup, target_amount=Decimal('100000.0')
         )
@@ -176,7 +184,9 @@ class PortfolioSnapshotModelTests(TestCase):
             email='inv@example.com',
             password='pass',
         )
-        investor = InvestorProfile.objects.create(user=investor_user, company_name='Acme Capital')
+        investor = InvestorProfile.objects.create(
+            user=investor_user, company_name='Acme Capital'
+        )
 
         self.investor = investor
 

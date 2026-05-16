@@ -52,11 +52,12 @@ class Tracking(models.Model):
     )
     meta = models.JSONField(null=True, blank=True)
 
-
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=~(models.Q(project__isnull=False) & models.Q(startup__isnull=False)),
+                check=~(
+                    models.Q(project__isnull=False) & models.Q(startup__isnull=False)
+                ),
                 name='tracking_not_both_project_and_startup',
             ),
             models.CheckConstraint(
@@ -96,11 +97,10 @@ class Tracking(models.Model):
     @property
     def target_id(self):
         if self.project is not None:
-            return self.project.id 
+            return self.project.id
         if self.startup is not None:
             return self.startup.id
         return None
-
 
     def clean(self):
         super().clean()
