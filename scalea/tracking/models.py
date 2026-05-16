@@ -28,7 +28,6 @@ class Tracking(models.Model):
         choices=TrackingTargetType.choices,
     )
 
-    # Exactly one of these should be set (enforced below)
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.CASCADE,
@@ -37,7 +36,7 @@ class Tracking(models.Model):
         related_name='tracking_entries',
     )
     startup = models.ForeignKey(
-        'startups.StartupProfile',  # adjust app label
+        'startups.StartupProfile',
         on_delete=models.CASCADE,
         null=True,
         blank=True,

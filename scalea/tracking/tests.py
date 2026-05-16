@@ -187,7 +187,6 @@ class PortfolioSnapshotModelTests(TestCase):
         investor = InvestorProfile.objects.create(
             user=investor_user, company_name='Acme Capital'
         )
-
         self.investor = investor
 
     def test_create_portfolio_snapshot(self):
