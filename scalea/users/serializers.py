@@ -2,10 +2,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions
 from django.db import transaction
-from investors.models import InvestorProfile
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from investors.models import InvestorProfile
 from startups.models import StartupProfile
 
 User = get_user_model()
