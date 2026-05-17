@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from datetime import timedelta
 from pathlib import Path
 
-from decouple import config
+from decouple import Csv, config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -154,11 +154,11 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://frontend:5173',
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:5173,http://127.0.0.1:5173,http://frontend:5173',
+    cast=Csv(),
+)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -176,6 +176,7 @@ REST_FRAMEWORK = {
         'anon': '100/day',
         'user': '1000/day',
         'login': '10/hour',
+        'register': '5/hour',
         'refresh': '10/minute',
         'logout': '10/minute',
         'password_reset': '5/hour',
@@ -191,6 +192,8 @@ SIMPLE_JWT = {
 }
 
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='')
 
 # Email backend: use console backend in local dev, SMTP in staging/production.
 EMAIL_BACKEND = config(

@@ -2,6 +2,7 @@ import hashlib
 import logging
 from datetime import timedelta
 
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
@@ -180,8 +181,29 @@ class PasswordResetConfirmView(APIView):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):  # noqa: ARG002
+        if settings.RECAPTCHA_SECRET_KEY:
+            token = request.data.get('recaptcha_token')
+            try:
+                resp = requests.post(
+                    'https://www.google.com/recaptcha/api/siteverify',
+                    data={
+                        'secret': settings.RECAPTCHA_SECRET_KEY,
+                        'response': token,
+                    },
+                    timeout=5,
+                )
+                if not resp.json().get('success'):
+                    return Response(
+                        {'detail': 'Invalid captcha. Please try again.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            except Exception:
+                logger.warning('reCAPTCHA verification request failed')
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
