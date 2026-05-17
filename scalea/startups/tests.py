@@ -1,10 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from projects.models import Project
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from projects.models import Project
 from startups.models import StartupProfile
 
 User = get_user_model()

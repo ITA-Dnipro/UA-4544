@@ -2,6 +2,8 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from projects.models import PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES, Project
+from projects.serializers import ProjectCardSerializer
 from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -10,8 +12,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from projects.models import PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES, Project
-from projects.serializers import ProjectCardSerializer
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (

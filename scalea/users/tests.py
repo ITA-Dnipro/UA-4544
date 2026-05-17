@@ -9,12 +9,12 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from investors.models import InvestorProfile
 from startups.models import StartupProfile
+
 from users.tokens import password_reset_token
 
 from .models import PasswordResetAudit

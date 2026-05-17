@@ -1,13 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from projects.models import Project, ProjectVisibility
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
+from startups.models import StartupProfile
 
 from investors.models import InvestorProfile, SavedItem, SavedStartup
 from investors.serializers import SavedItemCardSerializer
-from projects.models import Project, ProjectVisibility
-from startups.models import StartupProfile
 
 User = get_user_model()
 

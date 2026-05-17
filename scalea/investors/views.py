@@ -1,11 +1,10 @@
 from django.shortcuts import get_object_or_404
+from projects.models import Project
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from projects.models import Project
 from startups.models import StartupProfile
 
 from .models import InvestorProfile, SavedItem

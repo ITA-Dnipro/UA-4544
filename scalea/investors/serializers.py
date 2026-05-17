@@ -1,7 +1,6 @@
-from rest_framework import serializers
-
 from projects.models import Project
 from projects.permissions import ProjectVisibilityPermission
+from rest_framework import serializers
 from startups.models import StartupProfile
 
 from .models import InvestorProfile, SavedItem

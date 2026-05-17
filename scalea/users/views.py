@@ -12,6 +12,11 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from investors.models import InvestorProfile
+from investors.serializers import (
+    InvestorProfileUpdateSerializer,
+    InvestorPublicProfileSerializer,
+)
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, AllowAny
@@ -24,12 +29,6 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-
-from investors.models import InvestorProfile
-from investors.serializers import (
-    InvestorProfileUpdateSerializer,
-    InvestorPublicProfileSerializer,
-)
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (

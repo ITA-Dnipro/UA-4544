@@ -2,13 +2,13 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from investors.models import Investment, InvestorProfile
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from investors.models import Investment, InvestorProfile
-from projects.models import Project, ProjectStatus, ProjectVisibility
 from startups.models import StartupProfile
 from users.models import User
+
+from projects.models import Project, ProjectStatus, ProjectVisibility
 
 
 class ProjectModelTests(TestCase):
