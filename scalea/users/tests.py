@@ -191,10 +191,36 @@ class PasswordResetRequestTests(APITestCase):
         response = self.client.post(self.url, {'email': 'notanemail'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_audit_log_created(self):
-        initial_count = PasswordResetAudit.objects.count()
+    def test_audit_log_created_for_request(self):
+        """Test that password reset request creates audit log entry."""
+        initial_count = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_REQUESTED
+        ).count()
+
         self.client.post(self.url, {'email': self.email})
-        self.assertEqual(PasswordResetAudit.objects.count(), initial_count + 1)
+
+        new_count = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_REQUESTED
+        ).count()
+        self.assertEqual(new_count, initial_count + 1)
+
+        audit = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_REQUESTED
+        ).latest('created_at')
+        self.assertEqual(audit.user, self.user)
+        self.assertEqual(audit.email, self.email)
+        self.assertIsNotNone(audit.ip_address)
+
+    def test_audit_log_includes_user_agent(self):
+        """Test that audit log captures user agent."""
+        self.client.post(
+            self.url, {'email': self.email}, HTTP_USER_AGENT='Mozilla/5.0 Test Browser'
+        )
+
+        audit = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_REQUESTED
+        ).latest('created_at')
+        self.assertIn('Mozilla', audit.user_agent)
 
     def test_throttling_applies(self):
         for _ in range(5):
@@ -299,58 +325,250 @@ class PasswordResetConfirmViewTest(APITestCase):
         )
         self.uid = urlsafe_base64_encode(force_bytes(self.user.pk))
         self.token = password_reset_token.make_token(self.user)
-        self.combined_token = f'{self.uid}.{self.token}'
         self.url = '/api/auth/password-reset/confirm/'
 
-    def test_valid_token_changes_password(self):
+    def test_valid_token_and_uid_changes_password(self):
+        """Test that valid uid and token successfully reset password."""
         response = self.client.post(
             self.url,
             {
-                'token': self.combined_token,
+                'uid': self.uid,
+                'token': self.token,
                 'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], 'Password changed successfully.')
+
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewP@ssword1'))
 
+    def test_password_reset_creates_audit_log(self):
+        """Test that password reset confirmation creates an audit log entry."""
+        initial_count = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_CONFIRMED
+        ).count()
+
+        self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': 'NewP@ssword1',
+            },
+        )
+
+        new_count = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_CONFIRMED
+        ).count()
+        self.assertEqual(new_count, initial_count + 1)
+
+        audit = PasswordResetAudit.objects.filter(
+            action=PasswordResetAudit.ACTION_CONFIRMED
+        ).latest('created_at')
+        self.assertEqual(audit.user, self.user)
+        self.assertEqual(audit.email, self.user.email)
+        self.assertIsNotNone(audit.ip_address)
+
     def test_password_reset_revokes_existing_refresh_tokens(self):
+        """Test that refresh tokens are revoked after password reset."""
         refresh = str(RefreshToken.for_user(self.user))
 
         self.client.post(
             self.url,
             {
-                'token': self.combined_token,
+                'uid': self.uid,
+                'token': self.token,
                 'password': 'NewP@ssword1',
             },
         )
+
         refresh_response = self.client.post(
             '/api/auth/refresh/',
             {'refresh': refresh},
             format='json',
         )
-
         self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_invalid_token_returns_400(self):
+        """Test that invalid token returns 400."""
         response = self.client.post(
             self.url,
             {
-                'token': f'{self.uid}.invalid-token-123',
+                'uid': self.uid,
+                'token': 'invalid-token-123',
+                'password': 'NewP@ssword1',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Invalid or expired token.')
+
+    def test_expired_token_returns_400(self):
+        """Test that expired token returns 400."""
+        # Create a user with an old timestamp to simulate token expiry
+        with patch('users.tokens.password_reset_token.check_token', return_value=False):
+            response = self.client.post(
+                self.url,
+                {
+                    'uid': self.uid,
+                    'token': self.token,
+                    'password': 'NewP@ssword1',
+                },
+            )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_uid_returns_400(self):
+        """Test that invalid uid returns 400."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': 'invaliduid',
+                'token': self.token,
+                'password': 'NewP@ssword1',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Invalid or expired token.')
+
+    def test_nonexistent_user_returns_400(self):
+        """Test that nonexistent user ID returns 400."""
+        invalid_uid = urlsafe_base64_encode(force_bytes(999999))
+        response = self.client.post(
+            self.url,
+            {
+                'uid': invalid_uid,
+                'token': self.token,
                 'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_invalid_uid_returns_400(self):
+    def test_weak_password_returns_422(self):
+        """Test that weak password returns 422."""
         response = self.client.post(
             self.url,
             {
-                'token': f'invaliduid.{self.token}',
+                'uid': self.uid,
+                'token': self.token,
+                'password': '123',  # Too weak
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn('password', response.data)
+
+    def test_common_password_returns_422(self):
+        """Test that common password returns 422."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': 'password123',  # Common password
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn('password', response.data)
+
+    def test_numeric_password_returns_422(self):
+        """Test that all-numeric password returns 422."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': '12345678',  # All numeric
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn('password', response.data)
+
+    def test_missing_uid_returns_400(self):
+        """Test that missing uid returns 400."""
+        response = self.client.post(
+            self.url,
+            {
+                'token': self.token,
                 'password': 'NewP@ssword1',
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_token_returns_400(self):
+        """Test that missing token returns 400."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'password': 'NewP@ssword1',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_password_returns_400(self):
+        """Test that missing password returns 400 (malformed request)."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_token_single_use_enforced_by_expiry(self):
+        """Test that used token cannot be reused (enforced by token generator)."""
+        # First use
+        self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': 'NewP@ssword1',
+            },
+        )
+
+        # Django's PasswordResetTokenGenerator automatically invalidates
+        # tokens after first use by checking password_changed_date
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': 'AnotherNew@ssw0rd2',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_user_can_login_with_new_password_after_reset(self):
+        """Test that user can login with new password after reset."""
+        response = self.client.post(
+            self.url,
+            {
+                'uid': self.uid,
+                'token': self.token,
+                'password': 'NewP@ssword1',
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Refresh user from database and activate
+        self.user.refresh_from_db()
+        self.user.is_active = True
+        self.user.is_verified = True
+        self.user.is_startup = True
+        self.user.save()
+
+        login_response = self.client.post(
+            '/api/auth/login/',
+            {
+                'email': self.user.email,
+                'password': 'NewP@ssword1',
+                'role': 'startup',
+            },
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', login_response.data)
+        self.assertIn('refresh', login_response.data)
 
 
 class TestLoginApi(APITestCase):

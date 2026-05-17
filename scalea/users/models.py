@@ -23,6 +23,13 @@ class User(AbstractUser):
 
 
 class PasswordResetAudit(models.Model):
+    ACTION_REQUESTED = 'requested'
+    ACTION_CONFIRMED = 'confirmed'
+    ACTION_CHOICES = [
+        (ACTION_REQUESTED, 'Password Reset Requested'),
+        (ACTION_CONFIRMED, 'Password Reset Confirmed'),
+    ]
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -32,6 +39,13 @@ class PasswordResetAudit(models.Model):
     )
     email = models.EmailField(help_text='Електронна пошта, введена користувачем')
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True, default='')
+    action = models.CharField(
+        max_length=20,
+        choices=ACTION_CHOICES,
+        default=ACTION_REQUESTED,
+        help_text='Action performed: request or confirmation',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -40,4 +54,4 @@ class PasswordResetAudit(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Reset requested for {self.email} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'
+        return f'{self.get_action_display()} for {self.email} at {self.created_at.strftime("%Y-%m-%d %H:%M")}'

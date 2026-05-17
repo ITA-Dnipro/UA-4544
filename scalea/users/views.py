@@ -79,14 +79,17 @@ class PasswordResetRequestView(APIView):
         user = User.objects.filter(email=email).first()
 
         PasswordResetAudit.objects.create(
-            user=user, email=email, ip_address=get_client_ip(request)
+            user=user,
+            email=email,
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+            action=PasswordResetAudit.ACTION_REQUESTED,
         )
 
         if user:
             token = password_reset_token.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            combined_token = f'{uid}.{token}'
-            reset_url = f'{settings.FRONTEND_URL}/reset-password/{combined_token}/'
+            reset_url = f'{settings.FRONTEND_URL}/reset-password/{uid}/{token}/'
 
             display_name = (
                 user.first_name
@@ -144,21 +147,56 @@ class PasswordResetConfirmView(APIView):
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid()
 
-        raw_token = serializer.validated_data['token']
+        # Separate validation errors: required/malformed (400) vs weak password (422)
+        errors = serializer.errors
+        if errors:
+            # Check if password errors are from validate_password() (weak password)
+            password_errors = errors.get('password', [])
+            is_weak_password = any(
+                error.code != 'required' and error.code != 'blank'
+                for error in password_errors
+            )
+
+            if is_weak_password:
+                # 422 for password complexity/validation errors only
+                return Response(
+                    errors,
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            # 400 for malformed requests (missing fields, invalid uid/token format)
+            return Response(
+                errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uid_b64 = serializer.validated_data['uid']
+        token = serializer.validated_data['token']
         password = serializer.validated_data['password']
 
+        # Decode UID separately - handles base64 decoding errors
         try:
-            uid_b64, token = raw_token.split('.', 1)
             uid = force_str(urlsafe_base64_decode(uid_b64))
-            user = User.objects.filter(id=uid).first()
         except (ValueError, TypeError):
-            user = None
-
-        if not user or not password_reset_token.check_token(user, token):
             return Response(
-                {'detail': 'Invalid or expired token'},
+                {'detail': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Lookup user separately - handles non-existent user
+        try:
+            user = User.objects.get(id=uid)
+        except (User.DoesNotExist, ValueError):
+            return Response(
+                {'detail': 'Invalid or expired token.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate token
+        if not password_reset_token.check_token(user, token):
+            return Response(
+                {'detail': 'Invalid or expired token.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -166,13 +204,23 @@ class PasswordResetConfirmView(APIView):
             user.set_password(password)
             user.save()
 
+            # Revoke all outstanding refresh tokens
             for outstanding in OutstandingToken.objects.filter(user=user):
                 BlacklistedToken.objects.get_or_create(token=outstanding)
 
-        logger.info('Password reset successful for user ID: %s', user.pk)
+            # Log the password reset confirmation
+            PasswordResetAudit.objects.create(
+                user=user,
+                email=user.email,
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                action=PasswordResetAudit.ACTION_CONFIRMED,
+            )
+
+        logger.info('Password reset confirmed for user ID: %s', user.pk)
 
         return Response(
-            {'detail': 'Password changed successfully'},
+            {'detail': 'Password changed successfully.'},
             status=status.HTTP_200_OK,
         )
 

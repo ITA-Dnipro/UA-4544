@@ -19,11 +19,15 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
     token = serializers.CharField()
-    password = serializers.CharField(min_length=8)
+    password = serializers.CharField(min_length=8, write_only=True)
 
     def validate_password(self, value):
-        validate_password(value)
+        try:
+            validate_password(value)
+        except exceptions.ValidationError as e:
+            raise serializers.ValidationError(list(e.messages)) from e
         return value
 
 
