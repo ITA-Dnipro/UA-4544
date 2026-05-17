@@ -81,6 +81,26 @@ class RegistrationAPITests(TestCase):
             InvestorProfile.objects.filter(user__email='investor@example.com').exists()
         )
 
+    def test_org_admin_registration_sends_pending_approval_email(self):
+        response = self.client.post(
+            self.url,
+            {
+                'email': 'new-org-admin@example.com',
+                'password': 'StrongPassword123!',
+                'role': 'org_admin',
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['new-org-admin@example.com'])
+        self.assertEqual(
+            mail.outbox[0].subject,
+            'Welcome to Scalea — Org-Admin request pending approval',
+        )
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertEqual(mail.outbox[0].alternatives[0][1], 'text/html')
+
     def test_registration_duplicate_email_returns_201_and_masks_existence(self):
         existing_email = 'startup@example.com'
         User.objects.create_user(
@@ -701,3 +721,90 @@ class RegisterSecurityTests(APITestCase):
         cache.delete('throttle_register_127.0.0.1')
         response = self.client.post(self.url, other_data, format='json')
         self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class AdminOrgAdminModerationTests(APITestCase):
+    def setUp(self):
+        self.superadmin = User.objects.create_user(
+            email='superadmin@example.com',
+            username='superadmin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_superuser=True,
+            is_staff=True,
+        )
+        self.org_admin_pending = User.objects.create_user(
+            email='pending-org-admin@example.com',
+            username='pending-org-admin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_org_admin=True,
+            is_verified=False,
+        )
+        self.org_admin_verified = User.objects.create_user(
+            email='verified-org-admin@example.com',
+            username='verified-org-admin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_org_admin=True,
+            is_verified=True,
+        )
+        self.investor_user = User.objects.create_user(
+            email='investor-only@example.com',
+            username='investor-only@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_investor=True,
+        )
+        self.list_url = reverse('admin-user-moderation-list')
+
+    def test_superadmin_can_list_pending_org_admin_requests(self):
+        self.client.force_authenticate(user=self.superadmin)
+
+        response = self.client.get(
+            self.list_url,
+            {'role': 'org_admin', 'is_verified': 'false'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.org_admin_pending.id)
+        self.assertFalse(response.data[0]['is_verified'])
+        self.assertTrue(response.data[0]['is_org_admin'])
+
+    def test_superadmin_can_verify_org_admin(self):
+        self.client.force_authenticate(user=self.superadmin)
+        verify_url = reverse(
+            'verify-org-admin', kwargs={'pk': self.org_admin_pending.id}
+        )
+
+        response = self.client.patch(verify_url, {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.org_admin_pending.refresh_from_db()
+        self.assertTrue(self.org_admin_pending.is_verified)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.org_admin_pending.email])
+        self.assertEqual(
+            mail.outbox[0].subject,
+            'Scalea — Org-Admin verification successful',
+        )
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertEqual(mail.outbox[0].alternatives[0][1], 'text/html')
+
+    def test_non_superadmin_cannot_access_moderation_endpoints(self):
+        self.client.force_authenticate(user=self.investor_user)
+        verify_url = reverse(
+            'verify-org-admin', kwargs={'pk': self.org_admin_pending.id}
+        )
+
+        list_response = self.client.get(
+            self.list_url,
+            {'role': 'org_admin', 'is_verified': 'false'},
+            format='json',
+        )
+        verify_response = self.client.patch(verify_url, {}, format='json')
+
+        self.assertEqual(list_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(verify_response.status_code, status.HTTP_403_FORBIDDEN)
