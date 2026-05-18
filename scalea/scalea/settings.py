@@ -14,6 +14,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -194,6 +195,12 @@ SIMPLE_JWT = {
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
 RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='')
+
+if not DEBUG and not RECAPTCHA_SECRET_KEY:
+    raise ImproperlyConfigured(
+        'RECAPTCHA_SECRET_KEY must be set in production (DEBUG=False). '
+        'Use Google test key for local dev.'
+    )
 
 # Email backend: use console backend in local dev, SMTP in staging/production.
 EMAIL_BACKEND = config(
