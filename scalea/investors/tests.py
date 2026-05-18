@@ -171,6 +171,10 @@ class InvestorProfileAPITests(APITestCase):
         response = self.client.get(invalid_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_get_unauthenticated_returns_401(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
 
 class SavedItemAPITests(APITestCase):
     def setUp(self):
