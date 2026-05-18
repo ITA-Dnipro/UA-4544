@@ -30,7 +30,8 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-from startups.models import StartupProfile
+from startups.diff import _build_changes, _profile_snapshot
+from startups.models import ProfileAudit, StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
     StartupProfileUpdateSerializer,
@@ -373,8 +374,21 @@ class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
+        is_startup_profile = isinstance(instance, StartupProfile)
+        before = _profile_snapshot(instance) if is_startup_profile else None
+
         with transaction.atomic():
             serializer.save()
+            if is_startup_profile:
+                instance.refresh_from_db()
+                after = _profile_snapshot(instance)
+                changes = _build_changes(before, after)
+                if changes:
+                    ProfileAudit.objects.create(
+                        profile=instance,
+                        user=request.user if request.user.is_authenticated else None,
+                        changes=changes,
+                    )
 
         instance = self.get_object()
         if isinstance(instance, StartupProfile):

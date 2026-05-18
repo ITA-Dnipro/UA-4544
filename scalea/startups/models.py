@@ -48,3 +48,26 @@ class StartupProfile(models.Model):
 
     def __str__(self):
         return self.company_name
+
+
+class ProfileAudit(models.Model):
+    profile = models.ForeignKey(
+        StartupProfile,
+        on_delete=models.CASCADE,
+        related_name='audit_entries',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='profile_audits',
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    changes = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f'ProfileAudit(profile={self.profile_id}, user={self.user_id}, ts={self.timestamp})'
