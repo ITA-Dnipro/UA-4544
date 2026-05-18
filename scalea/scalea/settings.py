@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'projects',
     'messages.apps.MessagesConfig',
     'dashboard',
+    'tracking',
 ]
 
 AUTH_USER_MODEL = 'users.User'
