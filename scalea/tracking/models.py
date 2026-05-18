@@ -158,6 +158,20 @@ class Investment(models.Model):
     meta = models.JSONField(null=True, blank=True)
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(amount_committed__gte=0),
+                name='investment_amount_committed_non_negative',
+            ),
+            models.CheckConstraint(
+                check=models.Q(amount_invested__gte=0),
+                name='investment_amount_invested_non_negative',
+            ),
+            models.CheckConstraint(
+                check=models.Q(amount_committed__gte=models.F('amount_invested')),
+                name='investment_committed_gte_invested',
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=['investor', 'status'],
