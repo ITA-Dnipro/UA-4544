@@ -12,11 +12,23 @@ import ReCAPTCHA from 'react-google-recaptcha'
 //   7. recaptchaRef.current?.reset() after submit
 //   Available roles: 'startup' | 'investor' | 'org_admin'
 
+const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
+const API_URL = import.meta.env.VITE_API_URL as string | undefined
+
 export default function Register() {
   const recaptchaRef = useRef<ReCAPTCHA>(null)
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  if (!SITE_KEY || !API_URL) {
+    return (
+      <p style={{ color: 'red', padding: 24 }}>
+        Configuration error: VITE_RECAPTCHA_SITE_KEY or VITE_API_URL is not set.
+        Check your frontend/.env file.
+      </p>
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -29,7 +41,7 @@ export default function Register() {
     const form = e.currentTarget
     setLoading(true)
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register/`, {
+      const res = await fetch(`${API_URL}/api/auth/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -63,7 +75,7 @@ export default function Register() {
           <option value="investor">Investor</option>
           <option value="org_admin">Org Admin</option>
         </select>
-        <ReCAPTCHA ref={recaptchaRef} sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY} />
+        <ReCAPTCHA ref={recaptchaRef} sitekey={SITE_KEY} />
         <button type="submit" disabled={loading} style={{ padding: '10px 0', borderRadius: 4, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }}>
           {loading ? 'Loading...' : 'Register'}
         </button>
