@@ -171,10 +171,6 @@ class InvestorProfileAPITests(APITestCase):
         response = self.client.get(invalid_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_get_unauthenticated_returns_401(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
 
 class SavedItemAPITests(APITestCase):
     def setUp(self):
@@ -233,6 +229,10 @@ class SavedItemAPITests(APITestCase):
         payload = {'target_type': 'banana', 'target_id': '1'}
         response = self.client.post(self.url, payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_get_unauthenticated_returns_401(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_create_unauthenticated_returns_401(self):
         payload = {'target_type': 'startup', 'target_id': str(self.startup.pk)}
