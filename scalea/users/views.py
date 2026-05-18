@@ -39,9 +39,11 @@ from startups.serializers import (
 
 from .models import PasswordResetAudit
 from .security import (
-    clear_failures,
-    is_locked,
-    register_failure,
+    clear_login_failures,
+    is_login_locked,
+    is_register_locked,
+    record_login_failure,
+    record_register_attempt,
 )
 from .serializers import (
     LoginSerializer,
@@ -185,6 +187,12 @@ class RegisterView(generics.CreateAPIView):
     throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):  # noqa: ARG002
+        email = request.data.get('email', '').strip().lower()
+        if email and is_register_locked(email):
+            return Response(
+                {'detail': 'Too many registration attempts. Please try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         if settings.RECAPTCHA_SECRET_KEY:
             token = request.data.get('recaptcha_token')
             try:
@@ -209,6 +217,8 @@ class RegisterView(generics.CreateAPIView):
                     },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
+            if email:
+                record_register_attempt(email)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -232,7 +242,7 @@ class LoginView(APIView):
         raw_email = request.data.get('email')
         email = raw_email.strip().lower() if isinstance(raw_email, str) else ''
 
-        if email and is_locked(email):
+        if email and is_login_locked(email):
             return Response(
                 {'detail': ['Too many failed attempts. Try again later.']},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -242,7 +252,7 @@ class LoginView(APIView):
         if not serializer.is_valid():
             if 'detail' in serializer.errors:
                 if email:
-                    register_failure(email)
+                    record_login_failure(email)
                 return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -257,7 +267,7 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        clear_failures(email)
+        clear_login_failures(email)
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
