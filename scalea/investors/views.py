@@ -29,7 +29,7 @@ class SavedItemView(APIView):
         queryset = SavedItem.objects.filter(investor=investor)
 
         type_param = request.query_params.get('type')
-        if type_param in ['startup', 'project']:
+        if type_param in ['startup', 'project', 'company']:
             queryset = queryset.filter(target_type=type_param)
 
         paginator = PageNumberPagination()
