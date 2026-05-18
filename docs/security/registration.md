@@ -29,8 +29,6 @@ The registration endpoint (`POST /api/auth/register/`) is protected by:
 
 ## 2. Rate Limiting
 
-## 2. Rate Limiting
-
 ### 2a. Per-IP throttling (DRF ScopedRateThrottle)
 
 Configured in `settings.py` via `DEFAULT_THROTTLE_RATES`:
@@ -54,7 +52,7 @@ Implemented via `users/security.py`:
 |---|---|---|
 | `POST /api/auth/register/` | 5 attempts / hour per email | 1 hour |
 
-- Counted: `record_register_attempt(email)` — after successful captcha only
+- Counted: `record_register_attempt(email)` — only on failed registration attempts (serializer validation error)
 - Checked: `is_register_locked(email)` — at the very start of the request
 - Active only when `RECAPTCHA_SECRET_KEY` is set (production)
 - Uses cache keys `auth:register:count:{email}` and `auth:register:lock:{email}`

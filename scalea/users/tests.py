@@ -678,7 +678,7 @@ class RegisterSecurityTests(APITestCase):
     def test_per_email_lockout_after_5_attempts(self, mock_post):
         mock_post.return_value.json.return_value = {'success': True}
 
-        for _ in range(5):
+        for _ in range(6):
             cache.delete('throttle_register_127.0.0.1')
             self.client.post(self.url, self.valid_data, format='json')
 

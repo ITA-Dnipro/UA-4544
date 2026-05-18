@@ -22,14 +22,14 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
 
   if (!SITE_KEY || !API_URL) {
-    return (
-      <p style={{ color: 'red', padding: 24 }}>
-        Configuration error: VITE_RECAPTCHA_SITE_KEY or VITE_API_URL is not set.
-        Check your frontend/.env file.
-      </p>
+  return (
+    <p style={{ color: 'red', padding: 24 }}>
+      {import.meta.env.DEV
+        ? 'Dev config error: VITE_RECAPTCHA_SITE_KEY or VITE_API_URL missing in frontend/.env'
+        : 'Registration is temporarily unavailable. Please try again later.'}
+    </p>
     )
   }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const token = recaptchaRef.current?.getValue()

@@ -204,12 +204,13 @@ class RegisterView(generics.CreateAPIView):
                     },
                     timeout=5,
                 )
+                resp.raise_for_status()
                 if not resp.json().get('success'):
                     return Response(
                         {'detail': 'Invalid captcha. Please try again.'},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-            except requests.RequestException:
+            except (requests.RequestException, ValueError):
                 logger.warning('reCAPTCHA verification request failed')
                 return Response(
                     {
@@ -217,12 +218,14 @@ class RegisterView(generics.CreateAPIView):
                     },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+        except Exception:
             if email:
                 record_register_attempt(email)
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+            raise
 
         return Response(
             {
