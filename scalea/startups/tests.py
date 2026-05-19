@@ -468,4 +468,4 @@ class StartupRegionM2MTests(APITestCase):
         self.assertEqual(self.startup.regions.count(), 2)
         self.assertIn(self.region1, self.startup.regions.all())
         self.assertIn(self.region2, self.startup.regions.all())
-        
+
