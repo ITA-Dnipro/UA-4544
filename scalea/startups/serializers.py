@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from startups.models import Region, StartupProfile
 
+
 class RegionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Region

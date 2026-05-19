@@ -1,4 +1,5 @@
 from django.urls import path
+
 from startups.views import (
     RegionDetailView,
     RegionListCreateView,
