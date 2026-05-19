@@ -1,7 +1,7 @@
 from django.utils.html import linebreaks
 from rest_framework import serializers
 
-from startups.models import StartupProfile
+from startups.models import ProfileAudit, StartupProfile
 
 
 class StartupPublicProfileSerializer(serializers.ModelSerializer):
@@ -67,3 +67,14 @@ class StartupProfileUpdateSerializer(serializers.ModelSerializer):
                 'Enter a valid URL starting with http or https.'
             )
         return value
+
+
+class ProfileAuditSerializer(serializers.ModelSerializer):
+    user_id = serializers.SerializerMethodField()
+
+    def get_user_id(self, obj):
+        return obj.user_id
+
+    class Meta:
+        model = ProfileAudit
+        fields = ['id', 'profile', 'user_id', 'timestamp', 'changes']

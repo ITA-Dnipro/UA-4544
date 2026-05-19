@@ -12,9 +12,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from startups.models import StartupProfile
+from startups.diff import _build_changes, _profile_snapshot
+from startups.models import ProfileAudit, StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
+    ProfileAuditSerializer,
     StartupProfileUpdateSerializer,
     StartupPublicProfileSerializer,
 )
@@ -73,9 +75,19 @@ class StartupPublicProfileView(generics.RetrieveUpdateAPIView):
     def update(self, request, *_args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        before = _profile_snapshot(instance)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+        instance.refresh_from_db()
+        after = _profile_snapshot(instance)
+        changes = _build_changes(before, after)
+        if changes:
+            ProfileAudit.objects.create(
+                profile=instance,
+                user=request.user if request.user.is_authenticated else None,
+                changes=changes,
+            )
 
         return Response(StartupPublicProfileSerializer(instance).data)
 
@@ -146,6 +158,7 @@ class PublishProfileView(APIView):
             )
 
         with transaction.atomic():
+            before = _profile_snapshot(profile)
             updated = StartupProfile.objects.filter(
                 pk=profile.pk,
                 is_published=False,
@@ -154,6 +167,16 @@ class PublishProfileView(APIView):
                 published_at=timezone.now(),
                 published_by=request.user,
             )
+            if updated:
+                profile.refresh_from_db()
+                after = _profile_snapshot(profile)
+                changes = _build_changes(before, after)
+                if changes:
+                    ProfileAudit.objects.create(
+                        profile=profile,
+                        user=request.user if request.user.is_authenticated else None,
+                        changes=changes,
+                    )
 
         if updated == 0:
             return Response(
@@ -163,5 +186,74 @@ class PublishProfileView(APIView):
 
         return Response(
             {'detail': 'Profile published successfully.'},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProfileHistoryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class ProfileHistoryView(ListAPIView):
+    serializer_class = ProfileAuditSerializer
+    pagination_class = ProfileHistoryPagination
+    permission_classes = [IsAuthenticated, IsProfileOwnerOrAdmin]
+
+    def get_queryset(self):
+        profile = get_object_or_404(StartupProfile, user_id=self.kwargs['pk'])
+        self.check_object_permissions(self.request, profile)
+        return ProfileAudit.objects.filter(profile=profile).order_by('-timestamp')
+
+
+class RevertProfileOneStepView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        profile = get_object_or_404(StartupProfile, user_id=pk)
+
+        if request.user != profile.user:
+            return Response(
+                {'detail': 'Only owner can revert profile.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        last_audit = (
+            ProfileAudit.objects.filter(profile=profile).order_by('-timestamp').first()
+        )
+        if not last_audit:
+            return Response(
+                {'detail': 'No history to revert.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        before = _profile_snapshot(profile)
+
+        with transaction.atomic():
+            for field, delta in last_audit.changes.items():
+                if field == 'published_by_id':
+                    profile.published_by_id = delta.get('old')
+                else:
+                    setattr(profile, field, delta.get('old'))
+
+            profile.save()
+            profile.refresh_from_db()
+            after = _profile_snapshot(profile)
+            revert_changes = _build_changes(before, after)
+            if not revert_changes:
+                return Response(
+                    {'detail': 'Last history step cannot be reverted.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            ProfileAudit.objects.create(
+                profile=profile,
+                user=request.user,
+                changes=revert_changes,
+            )
+
+        return Response(
+            {'detail': 'Profile reverted by one step.'},
             status=status.HTTP_200_OK,
         )

@@ -19,7 +19,11 @@ from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-from startups.views import PublishProfileView
+from startups.views import (
+    ProfileHistoryView,
+    PublishProfileView,
+    RevertProfileOneStepView,
+)
 from users.views import UniversalProfileDetailView
 
 
@@ -47,6 +51,16 @@ urlpatterns = [
                     '<int:pk>/',
                     UniversalProfileDetailView.as_view(),
                     name='profile-detail',
+                ),
+                path(
+                    '<int:pk>/history/',
+                    ProfileHistoryView.as_view(),
+                    name='profile-history',
+                ),
+                path(
+                    '<int:pk>/revert/',
+                    RevertProfileOneStepView.as_view(),
+                    name='profile-revert',
                 ),
             ]
         ),
