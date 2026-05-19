@@ -1,7 +1,8 @@
 from django.utils.html import linebreaks
 from rest_framework import serializers
 
-from startups.models import StartupProfile, Region
+from startups.models import Region, StartupProfile
+
 
 class RegionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,7 +14,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     followers_count = serializers.SerializerMethodField(read_only=True)
     projects_count = serializers.SerializerMethodField(read_only=True)
-    
+
     regions = RegionSerializer(many=True, read_only=True)
 
     class Meta:
@@ -55,11 +56,11 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
 
 class StartupProfileUpdateSerializer(serializers.ModelSerializer):
     regions = serializers.PrimaryKeyRelatedField(
-        many=True, 
-        queryset=Region.objects.all(), 
+        many=True,
+        queryset=Region.objects.all(),
         required=False
     )
-    
+
     class Meta:
         model = StartupProfile
         fields = [

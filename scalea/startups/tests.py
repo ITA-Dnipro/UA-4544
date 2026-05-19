@@ -5,7 +5,7 @@ from projects.models import Project
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from startups.models import StartupProfile, Region
+from startups.models import Region, StartupProfile
 
 User = get_user_model()
 
@@ -434,7 +434,7 @@ class RegionAPITests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def test_create_region(self):
-        url = '/api/startups/regions/' 
+        url = '/api/startups/regions/'
         data = {'name': 'Dnipro region'}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -460,9 +460,9 @@ class StartupRegionM2MTests(APITestCase):
     def test_add_regions_to_startup(self):
         url = f'/api/startups/{self.startup.pk}/'
         data = {'regions': [self.region1.id, self.region2.id]}
-        
+
         response = self.client.patch(url, data, format='json')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.startup.refresh_from_db()
         self.assertEqual(self.startup.regions.count(), 2)

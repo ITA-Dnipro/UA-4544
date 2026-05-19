@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
+
 class Region(models.Model):
     name = models.CharField(max_length=100, unique=True)
     class Meta:
@@ -9,7 +10,7 @@ class Region(models.Model):
 
     def __str__(self):
         return self.name
-    
+
 class StartupProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255)

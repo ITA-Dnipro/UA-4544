@@ -5,14 +5,20 @@ from django.utils import timezone
 from projects.models import PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES, Project
 from projects.serializers import ProjectCardSerializer
 from rest_framework import generics, status
-from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (
+    ListAPIView,
+)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from startups.models import StartupProfile, Region
+from startups.models import Region, StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
     RegionSerializer,
