@@ -3,6 +3,16 @@ from django.db import models
 from django.utils.text import slugify
 
 
+class Region(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class StartupProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255)
@@ -14,6 +24,9 @@ class StartupProfile(models.Model):
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=50, blank=True)
     tags = models.JSONField(default=list, blank=True)
+    regions = models.ManyToManyField(
+        Region, blank=True, related_name='startup_profiles'
+    )
     website = models.URLField(blank=True)
     is_published = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)

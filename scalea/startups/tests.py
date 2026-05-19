@@ -5,7 +5,7 @@ from projects.models import Project
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from startups.models import StartupProfile
+from startups.models import Region, StartupProfile
 
 User = get_user_model()
 
@@ -426,3 +426,45 @@ class StartupProfileAPITests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class RegionAPITests(APITestCase):
+    def setUp(self):
+        self.user = _make_user('reguser', 'reg@example.com')
+        self.client.force_authenticate(user=self.user)
+
+    def test_create_region(self):
+        url = '/api/startups/regions/'
+        data = {'name': 'Dnipro region'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Region.objects.count(), 1)
+        self.assertEqual(Region.objects.get().name, 'Dnipro region')
+
+    def test_delete_region(self):
+        region = Region.objects.create(name='Temp Region')
+        url = f'/api/startups/regions/{region.pk}/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Region.objects.count(), 0)
+
+
+class StartupRegionM2MTests(APITestCase):
+    def setUp(self):
+        self.user = _make_user('m2muser', 'm2m@example.com')
+        self.client.force_authenticate(user=self.user)
+        self.startup = _make_startup(self.user)
+        self.region1 = Region.objects.create(name='Kyiv')
+        self.region2 = Region.objects.create(name='Lviv')
+
+    def test_add_regions_to_startup(self):
+        url = f'/api/startups/{self.startup.pk}/'
+        data = {'regions': [self.region1.id, self.region2.id]}
+
+        response = self.client.patch(url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.startup.refresh_from_db()
+        self.assertEqual(self.startup.regions.count(), 2)
+        self.assertIn(self.region1, self.startup.regions.all())
+        self.assertIn(self.region2, self.startup.regions.all())
