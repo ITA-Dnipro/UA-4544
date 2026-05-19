@@ -173,6 +173,7 @@ class PublishProfileView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
 class RegionListCreateView(generics.ListCreateAPIView):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer

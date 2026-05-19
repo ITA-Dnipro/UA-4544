@@ -9,6 +9,7 @@ class RegionSerializer(serializers.ModelSerializer):
         model = Region
         fields = ['id', 'name']
 
+
 class StartupPublicProfileSerializer(serializers.ModelSerializer):
     about_html = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
@@ -56,9 +57,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
 
 class StartupProfileUpdateSerializer(serializers.ModelSerializer):
     regions = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=Region.objects.all(),
-        required=False
+        many=True, queryset=Region.objects.all(), required=False
     )
 
     class Meta:

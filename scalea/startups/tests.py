@@ -442,7 +442,7 @@ class RegionAPITests(APITestCase):
         self.assertEqual(Region.objects.get().name, 'Dnipro region')
 
     def test_delete_region(self):
-        region = Region.objects.create(name="Temp Region")
+        region = Region.objects.create(name='Temp Region')
         url = f'/api/startups/regions/{region.pk}/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -454,8 +454,8 @@ class StartupRegionM2MTests(APITestCase):
         self.user = _make_user('m2muser', 'm2m@example.com')
         self.client.force_authenticate(user=self.user)
         self.startup = _make_startup(self.user)
-        self.region1 = Region.objects.create(name="Kyiv")
-        self.region2 = Region.objects.create(name="Lviv")
+        self.region1 = Region.objects.create(name='Kyiv')
+        self.region2 = Region.objects.create(name='Lviv')
 
     def test_add_regions_to_startup(self):
         url = f'/api/startups/{self.startup.pk}/'
@@ -468,5 +468,3 @@ class StartupRegionM2MTests(APITestCase):
         self.assertEqual(self.startup.regions.count(), 2)
         self.assertIn(self.region1, self.startup.regions.all())
         self.assertIn(self.region2, self.startup.regions.all())
-
-
