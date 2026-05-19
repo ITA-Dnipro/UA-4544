@@ -2,6 +2,7 @@ import hashlib
 import logging
 from datetime import timedelta
 
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
@@ -38,9 +39,11 @@ from startups.serializers import (
 
 from .models import PasswordResetAudit
 from .security import (
-    clear_failures,
-    is_locked,
-    register_failure,
+    clear_login_failures,
+    is_login_locked,
+    is_register_locked,
+    record_login_failure,
+    record_register_attempt,
 )
 from .serializers import (
     LoginSerializer,
@@ -180,11 +183,49 @@ class PasswordResetConfirmView(APIView):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
     def create(self, request, *args, **kwargs):  # noqa: ARG002
+        email = request.data.get('email', '').strip().lower()
+        if email and is_register_locked(email):
+            return Response(
+                {'detail': 'Too many registration attempts. Please try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        if settings.RECAPTCHA_SECRET_KEY:
+            token = request.data.get('recaptcha_token')
+            try:
+                resp = requests.post(
+                    'https://www.google.com/recaptcha/api/siteverify',
+                    data={
+                        'secret': settings.RECAPTCHA_SECRET_KEY,
+                        'response': token,
+                    },
+                    timeout=5,
+                )
+                resp.raise_for_status()
+                if not resp.json().get('success'):
+                    return Response(
+                        {'detail': 'Invalid captcha. Please try again.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            except (requests.RequestException, ValueError):
+                logger.warning('reCAPTCHA verification request failed')
+                return Response(
+                    {
+                        'detail': 'Captcha service temporarily unavailable. Please try again.'
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+        except Exception:
+            if email:
+                record_register_attempt(email)
+            raise
 
         return Response(
             {
@@ -204,7 +245,7 @@ class LoginView(APIView):
         raw_email = request.data.get('email')
         email = raw_email.strip().lower() if isinstance(raw_email, str) else ''
 
-        if email and is_locked(email):
+        if email and is_login_locked(email):
             return Response(
                 {'detail': ['Too many failed attempts. Try again later.']},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -214,7 +255,7 @@ class LoginView(APIView):
         if not serializer.is_valid():
             if 'detail' in serializer.errors:
                 if email:
-                    register_failure(email)
+                    record_login_failure(email)
                 return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -229,7 +270,7 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        clear_failures(email)
+        clear_login_failures(email)
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token

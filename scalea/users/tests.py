@@ -1,6 +1,7 @@
 import re
 from unittest.mock import patch
 
+import requests as req_lib
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
@@ -42,6 +43,7 @@ class UserModelTests(TestCase):
 
 class RegistrationAPITests(TestCase):
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
         self.url = reverse('register')
         self.valid_startup_data = {
@@ -626,3 +628,76 @@ class RefreshAndLogoutApiTests(APITestCase):
             format='json',
         )
         self.assertEqual(investor_login_response.status_code, status.HTTP_200_OK)
+
+
+class RegisterSecurityTests(APITestCase):
+    """Tests for reCAPTCHA and per-email throttling on registration."""
+
+    def setUp(self):
+        cache.clear()
+        self.url = reverse('register')
+        self.valid_data = {
+            'email': 'security@example.com',
+            'password': 'StrongPassword123!',
+            'role': 'startup',
+            'recaptcha_token': 'fake-token',
+        }
+
+    @patch('users.views.requests.post')
+    @override_settings(RECAPTCHA_SECRET_KEY='test-secret')
+    def test_captcha_success_allows_registration(self, mock_post):
+        mock_post.return_value.json.return_value = {'success': True}
+        response = self.client.post(self.url, self.valid_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch('users.views.requests.post')
+    @override_settings(RECAPTCHA_SECRET_KEY='test-secret')
+    def test_captcha_failure_returns_400(self, mock_post):
+        mock_post.return_value.json.return_value = {'success': False}
+        response = self.client.post(self.url, self.valid_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Invalid captcha. Please try again.')
+
+    @patch('users.views.requests.post', side_effect=req_lib.RequestException('timeout'))
+    @override_settings(RECAPTCHA_SECRET_KEY='test-secret')
+    def test_captcha_service_down_returns_503(self, _mock_post):
+        with self.assertLogs('users.views', level='WARNING') as cm:
+            response = self.client.post(self.url, self.valid_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertTrue(any('reCAPTCHA' in msg for msg in cm.output))
+
+    @override_settings(RECAPTCHA_SECRET_KEY='', DEBUG=True)
+    def test_no_captcha_key_dev_mode_skips_verification(self):
+        data = self.valid_data.copy()
+        data.pop('recaptcha_token')
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch('users.views.requests.post')
+    @override_settings(RECAPTCHA_SECRET_KEY='test-secret')
+    def test_per_email_lockout_after_5_attempts(self, mock_post):
+        mock_post.return_value.json.return_value = {'success': True}
+
+        for _ in range(6):
+            cache.delete('throttle_register_127.0.0.1')
+            self.client.post(self.url, self.valid_data, format='json')
+
+        response = self.client.post(self.url, self.valid_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('Too many registration attempts', response.data['detail'])
+
+    @patch('users.views.requests.post')
+    @override_settings(RECAPTCHA_SECRET_KEY='test-secret')
+    def test_different_email_not_affected_by_lockout(self, mock_post):
+        """Lockout on one email does not affect another email."""
+        mock_post.return_value.json.return_value = {'success': True}
+
+        for _ in range(5):
+            cache.delete('throttle_register_127.0.0.1')
+            self.client.post(self.url, self.valid_data, format='json')
+
+        other_data = self.valid_data.copy()
+        other_data['email'] = 'other@example.com'
+        cache.delete('throttle_register_127.0.0.1')
+        response = self.client.post(self.url, other_data, format='json')
+        self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
