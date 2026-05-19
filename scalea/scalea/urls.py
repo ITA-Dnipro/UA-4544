@@ -31,6 +31,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health_check),
     path('api/auth/', include('users.urls')),
+    path('api/admin/users/', include('users.admin_urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
     path('api/users/', include('investors.urls')),

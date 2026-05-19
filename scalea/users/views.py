@@ -38,6 +38,7 @@ from startups.serializers import (
 )
 
 from .models import PasswordResetAudit
+from .permissions import IsSuperAdmin
 from .security import (
     clear_login_failures,
     is_login_locked,
@@ -46,6 +47,7 @@ from .security import (
     record_register_attempt,
 )
 from .serializers import (
+    AdminUserModerationSerializer,
     LoginSerializer,
     LogoutSerializer,
     PasswordResetConfirmSerializer,
@@ -56,6 +58,71 @@ from .tokens import password_reset_token
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def send_org_admin_pending_email(user):
+    display_name = (
+        user.first_name
+        or user.get_full_name().strip()
+        or user.username
+        or user.email.split('@')[0]
+    )
+    html_body = render_to_string(
+        'email/org_admin_pending.html',
+        {'user_name': display_name},
+    )
+    email_msg = EmailMultiAlternatives(
+        subject='Welcome to Scalea — Org-Admin request pending approval',
+        body=(
+            'Welcome to Scalea!\n\n'
+            'Your Org-Admin registration request has been received and is currently '
+            'pending SuperAdmin approval.\n'
+            'You will receive another email as soon as your account is verified.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email_msg.attach_alternative(html_body, 'text/html')
+
+    try:
+        email_msg.send(fail_silently=False)
+    except Exception:
+        logger.exception(
+            'Failed to send pending-approval email to %s',
+            mask_email_for_log(user.email),
+        )
+
+
+def send_org_admin_verified_email(user):
+    display_name = (
+        user.first_name
+        or user.get_full_name().strip()
+        or user.username
+        or user.email.split('@')[0]
+    )
+    html_body = render_to_string(
+        'email/org_admin_verified.html',
+        {'user_name': display_name},
+    )
+    email_msg = EmailMultiAlternatives(
+        subject='Scalea — Org-Admin verification successful',
+        body=(
+            'Great news!\n\n'
+            'Your Org-Admin account has been verified by a SuperAdmin. '
+            'You can now log in as Org-Admin.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email_msg.attach_alternative(html_body, 'text/html')
+
+    try:
+        email_msg.send(fail_silently=False)
+    except Exception:
+        logger.exception(
+            'Failed to send org-admin verified email to %s',
+            mask_email_for_log(user.email),
+        )
 
 
 def get_client_ip(request):
@@ -227,6 +294,9 @@ class RegisterView(generics.CreateAPIView):
                 record_register_attempt(email)
             raise
 
+        if serializer.validated_data.get('role') == 'org_admin':
+            send_org_admin_pending_email(user)
+
         return Response(
             {
                 'email': user.email,
@@ -309,6 +379,43 @@ class LogoutView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminUserModerationListView(generics.ListAPIView):
+    serializer_class = AdminUserModerationSerializer
+    permission_classes = [IsSuperAdmin]
+
+    def get_queryset(self):
+        queryset = User.objects.all().order_by('-created_at')
+
+        role = self.request.query_params.get('role')
+        is_verified = self.request.query_params.get('is_verified')
+
+        if role == 'org_admin':
+            queryset = queryset.filter(is_org_admin=True)
+
+        if is_verified is not None:
+            normalized_is_verified = is_verified.strip().lower()
+            if normalized_is_verified == 'true':
+                queryset = queryset.filter(is_verified=True)
+            elif normalized_is_verified == 'false':
+                queryset = queryset.filter(is_verified=False)
+
+        return queryset
+
+
+class VerifyOrgAdminView(generics.UpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = AdminUserModerationSerializer
+    permission_classes = [IsSuperAdmin]
+    http_method_names = ['patch']
+
+    def patch(self, _request, *_args, **_kwargs):
+        user = self.get_object()
+        user.is_verified = True
+        user.save(update_fields=['is_verified'])
+        send_org_admin_verified_email(user)
+        return Response(self.get_serializer(user).data, status=status.HTTP_200_OK)
 
 
 class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):

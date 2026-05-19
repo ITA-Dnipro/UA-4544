@@ -27,7 +27,7 @@ class IsProjectOwnerOrOrgAdmin(permissions.BasePermission):
             return True
 
         is_owner = obj.startup.user == user
-        is_admin = user.is_org_admin and obj.startup.user == user
+        is_admin = user.is_org_admin
 
         return is_owner or is_admin
 
@@ -46,12 +46,10 @@ class ProjectVisibilityPermission(permissions.BasePermission):
         if obj.visibility == ProjectVisibility.UNLISTED:
             return (
                 obj.startup.user == request.user
-                or (request.user.is_org_admin and obj.startup.user == request.user)
+                or request.user.is_org_admin
                 or obj.investment_set.filter(
                     investor_profile__user=request.user
                 ).exists()
             )
 
-        return obj.startup.user == request.user or (
-            request.user.is_org_admin and obj.startup.user == request.user
-        )
+        return obj.startup.user == request.user or request.user.is_org_admin
