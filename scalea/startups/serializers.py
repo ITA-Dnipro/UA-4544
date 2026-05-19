@@ -1,14 +1,20 @@
 from django.utils.html import linebreaks
 from rest_framework import serializers
 
-from startups.models import StartupProfile
+from startups.models import StartupProfile, Region
 
+class RegionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Region
+        fields = ['id', 'name']
 
 class StartupPublicProfileSerializer(serializers.ModelSerializer):
     about_html = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
     followers_count = serializers.SerializerMethodField(read_only=True)
     projects_count = serializers.SerializerMethodField(read_only=True)
+    
+    regions = RegionSerializer(many=True, read_only=True)
 
     class Meta:
         model = StartupProfile
@@ -26,6 +32,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
             'followers_count',
             'projects_count',
             'created_at',
+            'regions',
         ]
 
     def get_about_html(self, obj):
@@ -47,6 +54,12 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
 
 
 class StartupProfileUpdateSerializer(serializers.ModelSerializer):
+    regions = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Region.objects.all(), 
+        required=False
+    )
+    
     class Meta:
         model = StartupProfile
         fields = [
@@ -59,6 +72,7 @@ class StartupProfileUpdateSerializer(serializers.ModelSerializer):
             'contact_phone',
             'website',
             'tags',
+            'regions',
         ]
 
     def validate_website(self, value):
