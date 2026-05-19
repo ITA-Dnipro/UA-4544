@@ -410,7 +410,7 @@ class VerifyOrgAdminView(generics.UpdateAPIView):
     permission_classes = [IsSuperAdmin]
     http_method_names = ['patch']
 
-    def patch(self, request, *args, **kwargs):  # noqa: ARG002
+    def patch(self, _request, *_args, **_kwargs):
         user = self.get_object()
         user.is_verified = True
         user.save(update_fields=['is_verified'])
