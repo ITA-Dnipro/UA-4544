@@ -2,7 +2,6 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
-
 class Region(models.Model):
     name = models.CharField(max_length=100, unique=True)
     class Meta:

@@ -26,7 +26,6 @@ from startups.serializers import (
     StartupPublicProfileSerializer,
 )
 
-
 class StartupListView(generics.ListAPIView):
     serializer_class = StartupPublicProfileSerializer
 
