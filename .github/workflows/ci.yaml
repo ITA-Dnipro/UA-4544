@@ -31,6 +31,9 @@ jobs:
        run: ruff format --check scalea/
 
      - name: Run tests with coverage
+       env:
+         DEBUG: "True"
+         RECAPTCHA_SECRET_KEY: "test-secret"
        run: pytest --cov=scalea --cov-report=xml
 
      - name: Upload coverage to Codecov
