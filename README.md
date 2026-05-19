@@ -180,25 +180,44 @@ The password reset endpoint (`POST /api/auth/password-reset/`) implements a secu
 #### Security Features
 
 ✅ **Anti-Enumeration Protection**
-- Always returns `200 OK` regardless of whether email exists
-- Same response message for existing and non-existing emails
-- Prevents attackers from discovering valid email addresses
+- The reset request endpoint always returns `200 OK`
+- Same response is returned for existing and non-existing emails
+- Unknown emails do not receive reset emails
 
 ✅ **Rate Limiting**
-- **IP-based:** 5 requests per hour per IP address
-- **Email-based:** 3 requests per hour per email address
-- Returns `429 Too Many Requests` when limits exceeded
+- Password reset endpoints are protected by DRF scoped throttling
+- Scope: `password_reset`
+- Default configured rate: `5/hour`
 
-✅ **Token Security**
-- Cryptographically secure tokens using Django's `PasswordResetTokenGenerator`
-- Tokens expire after 1 hour (configurable via `PASSWORD_RESET_TIMEOUT`)
-- One-time use tokens
-- Only active, verified users receive reset emails
+✅ **Secure Token Generation**
+- Uses Django's `PasswordResetTokenGenerator`
+- Token validity is controlled by `PASSWORD_RESET_TIMEOUT`
+- Current default: `300` seconds / 5 minutes
 
-✅ **Audit Logging**
-- All password reset attempts logged to `PasswordResetAttempt` model
-- Tracks: user, email, IP address, token sent status, timestamp
-- Enables security monitoring and abuse detection
+✅ **Token Lifecycle Tracking**
+- Reset token issuance is recorded in `PasswordResetAudit`
+- Raw tokens are never stored in the database
+- Only `token_hash` is stored
+- Tokens are checked against the audit record during confirmation
+
+✅ **Single-Use Enforcement**
+- Successful confirmation sets `used_at`
+- A used token cannot be reused
+- Reused tokens return `400 Bad Request`
+
+✅ **Revocation Support**
+- When a new reset token is issued for a user, previous active reset tokens are revoked
+- Revoked tokens cannot be confirmed
+- Admin users can revoke outstanding tokens in Django admin
+
+✅ **Concurrent Request Protection**
+- Token issuance/revocation is performed in a transaction
+- Existing active audits are locked with `select_for_update()`
+- This prevents concurrent reset requests from leaving multiple active tokens for the same user on databases that support row-level locking, such as PostgreSQL
+
+✅ **Session Invalidation**
+- After successful password reset confirmation, outstanding refresh tokens are blacklisted
+- Existing JWT sessions are invalidated
 
 #### Email Delivery and Templates
 
@@ -248,19 +267,25 @@ PASSWORD_RESET_TIMEOUT=300
 
 Run password reset tests:
 ```bash
-python manage.py test users.tests.TestPasswordResetApi -v 2
+python manage.py test users.tests.PasswordResetRequestTests -v 2
+python manage.py test users.tests.PasswordResetConfirmViewTest -v 2
+python manage.py test users.tests.PasswordResetTokenLifecycleTests -v 2
 ```
 
 **Test Coverage:**
-- Email sent for known, active users
-- No email for unknown users
-- No email for inactive users
-- Email normalization (lowercase)
-- Rate limiting (IP and email)
-- Audit logging with IP tracking
-- Token generation and validation
-- Anti-enumeration verification
-- Email content validation
+- Request returns `200 OK` for known and unknown emails
+- Invalid email returns `400 Bad Request`
+- Email is sent only for known users
+- Email contains reset URL
+- Reset token format is valid
+- Token confirmation changes password
+- Token is marked used after successful confirmation
+- Used token cannot be reused
+- Revoked token fails confirmation
+- Expired token fails confirmation
+- New reset request revokes previous active tokens
+- Admin can revoke outstanding tokens
+- Password reset invalidates existing refresh tokens
 
 #### API Usage Example
 ```bash
@@ -277,22 +302,25 @@ curl -X POST http://localhost:8000/api/auth/password-reset/ \
 
 #### Database Schema
 
-**PasswordResetAttempt Model:**
+**PasswordResetAudit Model:**
 ```python
-class PasswordResetAttempt(models.Model):
+class PasswordResetAudit(models.Model):
     user = models.ForeignKey(User, null=True, blank=True)
-    email = models.EmailField(db_index=True)
-    ip_address = models.GenericIPAddressField()
-    token_sent = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    email = models.EmailField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    token_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    revoked = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 ```
 
 #### Implementation Notes
 
 The password reset flow consists of two steps:
 
-1. **Request** (implemented) - User requests reset via email, receives link
-2. **Confirm** (to be implemented) - User submits new password with uid/token from email
+1. **Request** - User requests reset via email, receives link
+2. **Confirm** - User submits new password with uid/token from email
 
 This endpoint implements step 1. The confirm endpoint will validate the uid/token and allow the user to set a new password.
 
