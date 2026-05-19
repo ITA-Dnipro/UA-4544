@@ -3,7 +3,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import requests as req_lib
-from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase
