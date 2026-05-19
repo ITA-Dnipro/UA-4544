@@ -1,11 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from projects.models import Project, ProjectVisibility
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIRequestFactory, APITestCase
 from startups.models import StartupProfile
 
 from investors.models import InvestorProfile, SavedItem, SavedStartup
+from investors.serializers import SavedItemCardSerializer
 
 User = get_user_model()
 
@@ -169,6 +171,10 @@ class InvestorProfileAPITests(APITestCase):
         response = self.client.get(invalid_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_get_unauthenticated_returns_401(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
 
 class SavedItemAPITests(APITestCase):
     def setUp(self):
@@ -301,3 +307,273 @@ class SavedItemAPITests(APITestCase):
         url = f'/api/users/{other_investor_user.id}/saved/{saved_item.pk}/'
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SavedItemCardSerializerTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+        self.user = User.objects.create_user(
+            username='investor',
+            email='inv@t.com',
+            password='123',
+            is_investor=True,
+        )
+        self.investor = InvestorProfile.objects.create(
+            user=self.user,
+            company_name='VC',
+        )
+
+        self.startup_user = User.objects.create_user(
+            username='startup',
+            email='s@t.com',
+            password='123',
+            is_startup=True,
+        )
+        self.startup = StartupProfile.objects.create(
+            user=self.startup_user,
+            company_name='Test Startup',
+            logo_url='http://logo',
+            short_description='desc',
+            tags=['tag1', 'tag2'],
+            description='desc',
+            website='https://test.com',
+        )
+
+        self.project = Project.objects.create(
+            startup=self.startup,
+            title='Test Project',
+            slug='test-project',
+            short_description='Project desc',
+            description='Full project description',
+            target_amount=1000,
+            currency='UAH',
+            visibility=ProjectVisibility.PUBLIC,
+        )
+
+    def serialize(self, saved, user=None):
+        request = self.factory.get('/api/users/1/saved/')
+        request.user = user or self.user
+
+        return SavedItemCardSerializer(
+            saved,
+            context={'request': request},
+        ).data
+
+    def test_startup_card_fields(self):
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='startup',
+            target_id=self.startup.pk,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(self.startup.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'startup')
+        self.assertEqual(data['title'], self.startup.company_name)
+        self.assertEqual(data['slug'], self.startup.slug)
+        self.assertEqual(data['thumbnail_url'], self.startup.logo_url)
+        self.assertEqual(data['short_description'], self.startup.short_description)
+        self.assertEqual(data['tags'], self.startup.tags)
+        self.assertTrue(data['is_available'])
+        self.assertIsNone(data['unavailable_reason'])
+
+    def test_company_card_fields(self):
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='company',
+            target_id=self.startup.pk,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(self.startup.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'company')
+        self.assertEqual(data['title'], self.startup.company_name)
+        self.assertEqual(data['slug'], self.startup.slug)
+        self.assertEqual(data['thumbnail_url'], self.startup.logo_url)
+        self.assertEqual(data['short_description'], self.startup.short_description)
+        self.assertEqual(data['tags'], self.startup.tags)
+        self.assertTrue(data['is_available'])
+        self.assertIsNone(data['unavailable_reason'])
+
+    def test_project_public_card_fields(self):
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=self.project.pk,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(self.project.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertEqual(data['title'], self.project.title)
+        self.assertEqual(data['slug'], self.project.slug)
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertEqual(data['short_description'], self.project.short_description)
+        self.assertEqual(data['tags'], [])
+        self.assertTrue(data['is_available'])
+        self.assertIsNone(data['unavailable_reason'])
+
+    def test_project_private_card_fields(self):
+        self.project.visibility = ProjectVisibility.PRIVATE
+        self.project.save()
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=self.project.pk,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(self.project.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertIsNone(data['title'])
+        self.assertIsNone(data['slug'])
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertIsNone(data['short_description'])
+        self.assertEqual(data['tags'], [])
+        self.assertFalse(data['is_available'])
+        self.assertEqual(
+            data['unavailable_reason'],
+            'This item is currently unavailable.',
+        )
+
+    def test_project_unlisted_card_fields(self):
+        self.project.visibility = ProjectVisibility.UNLISTED
+        self.project.save()
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=self.project.pk,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(self.project.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertIsNone(data['title'])
+        self.assertIsNone(data['slug'])
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertIsNone(data['short_description'])
+        self.assertEqual(data['tags'], [])
+        self.assertFalse(data['is_available'])
+        self.assertEqual(
+            data['unavailable_reason'],
+            'This item is currently unavailable.',
+        )
+
+    def test_project_deleted_card_fields(self):
+        project_id = self.project.pk
+        self.project.delete()
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=project_id,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(project_id))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertIsNone(data['title'])
+        self.assertIsNone(data['slug'])
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertIsNone(data['short_description'])
+        self.assertEqual(data['tags'], [])
+        self.assertFalse(data['is_available'])
+        self.assertEqual(
+            data['unavailable_reason'],
+            'This item is no longer available.',
+        )
+
+    def test_startup_deleted_card_fields(self):
+        startup_id = self.startup.pk
+        self.startup.delete()
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='startup',
+            target_id=startup_id,
+        )
+
+        data = self.serialize(saved)
+
+        self.assertEqual(data['id'], str(startup_id))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'startup')
+        self.assertIsNone(data['title'])
+        self.assertIsNone(data['slug'])
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertIsNone(data['short_description'])
+        self.assertEqual(data['tags'], [])
+        self.assertFalse(data['is_available'])
+        self.assertEqual(
+            data['unavailable_reason'],
+            'This item is no longer available.',
+        )
+
+    def test_unlisted_project_visible_to_owner(self):
+        self.project.visibility = ProjectVisibility.UNLISTED
+        self.project.save()
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=self.project.pk,
+        )
+
+        data = self.serialize(saved, user=self.startup_user)
+
+        self.assertEqual(data['id'], str(self.project.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertEqual(data['title'], self.project.title)
+        self.assertEqual(data['slug'], self.project.slug)
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertEqual(data['short_description'], self.project.short_description)
+        self.assertEqual(data['tags'], [])
+        self.assertTrue(data['is_available'])
+        self.assertIsNone(data['unavailable_reason'])
+
+    def test_unlisted_project_visible_to_admin(self):
+        self.project.visibility = ProjectVisibility.UNLISTED
+        self.project.save()
+
+        admin_user = User.objects.create_user(
+            username='admin',
+            email='admin@t.com',
+            password='123',
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        saved = SavedItem.objects.create(
+            investor=self.investor,
+            target_type='project',
+            target_id=self.project.pk,
+        )
+
+        data = self.serialize(saved, user=admin_user)
+
+        self.assertEqual(data['id'], str(self.project.pk))
+        self.assertEqual(data['saved_id'], saved.id)
+        self.assertEqual(data['type'], 'project')
+        self.assertEqual(data['title'], self.project.title)
+        self.assertEqual(data['slug'], self.project.slug)
+        self.assertIsNone(data['thumbnail_url'])
+        self.assertEqual(data['short_description'], self.project.short_description)
+        self.assertEqual(data['tags'], [])
+        self.assertTrue(data['is_available'])
+        self.assertIsNone(data['unavailable_reason'])
