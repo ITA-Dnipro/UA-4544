@@ -40,6 +40,7 @@ class UserModelTests(TestCase):
         self.assertTrue(user.is_verified)
 
 
+@override_settings(RECAPTCHA_SECRET_KEY='')
 class RegistrationAPITests(TestCase):
     def setUp(self):
         cache.clear()
@@ -556,6 +557,7 @@ class TestLoginApi(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+@override_settings(RECAPTCHA_SECRET_KEY='')
 class RefreshAndLogoutApiTests(APITestCase):
     def setUp(self):
         cache.clear()
