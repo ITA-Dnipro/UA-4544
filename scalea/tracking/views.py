@@ -1,3 +1,4 @@
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from investors.models import InvestorProfile
 from rest_framework import generics, permissions, status
@@ -27,32 +28,41 @@ class TrackingView(APIView):
         project = serializer.validated_data.get('project')
 
         tracking = None
-        if target_type == TrackingTargetType.STARTUP:
-            tracking = Tracking.objects.filter(
-                investor=investor, target_type=target_type, startup=startup
-            ).first()
-        elif target_type == TrackingTargetType.PROJECT:
-            tracking = Tracking.objects.filter(
-                investor=investor, target_type=target_type, project=project
-            ).first()
+        created = False
+        try:
+            with transaction.atomic():
+                if target_type == TrackingTargetType.STARTUP:
+                    tracking, created = Tracking.objects.get_or_create(
+                        investor=investor,
+                        target_type=target_type,
+                        startup=startup,
+                        defaults={'source': source},
+                    )
+                elif target_type == TrackingTargetType.PROJECT:
+                    tracking, created = Tracking.objects.get_or_create(
+                        investor=investor,
+                        target_type=target_type,
+                        project=project,
+                        defaults={'source': source},
+                    )
+        except IntegrityError:
+            if target_type == TrackingTargetType.STARTUP:
+                tracking = Tracking.objects.get(
+                    investor=investor, target_type=target_type, startup=startup
+                )
+            elif target_type == TrackingTargetType.PROJECT:
+                tracking = Tracking.objects.get(
+                    investor=investor, target_type=target_type, project=project
+                )
+            created = False
 
-        if tracking:
-            resp_serializer = TrackingResponseSerializer(
-                tracking, context={'request': request}
-            )
-            return Response(resp_serializer.data, status=status.HTTP_200_OK)
-
-        tracking = Tracking.objects.create(
-            investor=investor,
-            target_type=target_type,
-            startup=startup,
-            project=project,
-            source=source,
-        )
         resp_serializer = TrackingResponseSerializer(
             tracking, context={'request': request}
         )
-        return Response(resp_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            resp_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class TrackingDetailView(APIView):
