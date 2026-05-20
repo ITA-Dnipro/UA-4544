@@ -1,13 +1,21 @@
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from investors.models import InvestorProfile
+from projects.permissions import ProjectVisibilityPermission
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Tracking, TrackingTargetType
 from .serializers import TrackingCreateSerializer, TrackingResponseSerializer
+
+
+class TrackingPageNumberPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class TrackingView(APIView):
@@ -31,6 +39,13 @@ class TrackingView(APIView):
         source = serializer.validated_data.get('source')
         startup = serializer.validated_data.get('startup')
         project = serializer.validated_data.get('project')
+
+        if target_type == TrackingTargetType.PROJECT and project is not None:
+            perm = ProjectVisibilityPermission()
+            if not perm.has_object_permission(request, self, project):
+                return Response(
+                    {'detail': 'Project not found.'}, status=status.HTTP_404_NOT_FOUND
+                )
 
         try:
             with transaction.atomic():
@@ -87,6 +102,7 @@ class TrackingDetailView(APIView):
 class InvestorTrackingListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = TrackingResponseSerializer
+    pagination_class = TrackingPageNumberPagination
 
     def get_queryset(self):
         investor_id = self.kwargs['investor_id']

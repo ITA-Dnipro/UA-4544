@@ -309,19 +309,23 @@ class TrackingAPITests(APITestCase):
             },
             format='json',
         )
-        url = f'/api/tracking/investors/{self.investor.pk}/tracking/?type=startup'
+        url = f'/api/investors/{self.investor.pk}/tracking/?type=startup'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
-        self.assertEqual(len(response.data), 1)
-        item = response.data[0]
+        self.assertIn('results', response.data)
+        self.assertIn('count', response.data)
+        self.assertIn('next', response.data)
+        self.assertIn('previous', response.data)
+        self.assertIsInstance(response.data['results'], list)
+        self.assertEqual(len(response.data['results']), 1)
+        item = response.data['results'][0]
         self.assertEqual(item['target_type'], 'startup')
         self.assertIn('title', item)
         self.assertIn('slug', item)
         self.assertIn('thumbnail_url', item)
 
     def test_unauthorized_returns_401(self):
-        url = f'/api/tracking/investors/{self.investor.pk}/tracking/'
+        url = f'/api/investors/{self.investor.pk}/tracking/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         post_url = '/api/tracking/'
@@ -362,6 +366,6 @@ class TrackingAPITests(APITestCase):
 
     def test_non_owner_list_returns_403(self):
         self.authenticate(self.other_user)
-        url = f'/api/tracking/investors/{self.investor.pk}/tracking/'
+        url = f'/api/investors/{self.investor.pk}/tracking/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
