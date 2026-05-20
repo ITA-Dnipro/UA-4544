@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from investors.models import InvestorProfile
 from rest_framework import generics, permissions, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,14 +21,17 @@ class TrackingView(APIView):
             )
         serializer = TrackingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        investor = get_object_or_404(InvestorProfile, user=request.user)
+        investor = InvestorProfile.objects.filter(user=request.user).first()
+        if not investor:
+            return Response(
+                {'detail': 'Investor profile required.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         target_type = serializer.validated_data['target_type']
         source = serializer.validated_data.get('source')
         startup = serializer.validated_data.get('startup')
         project = serializer.validated_data.get('project')
 
-        tracking = None
-        created = False
         try:
             with transaction.atomic():
                 if target_type == TrackingTargetType.STARTUP:
@@ -45,6 +48,7 @@ class TrackingView(APIView):
                         project=project,
                         defaults={'source': source},
                     )
+
         except IntegrityError:
             if target_type == TrackingTargetType.STARTUP:
                 tracking = Tracking.objects.get(
@@ -54,6 +58,7 @@ class TrackingView(APIView):
                 tracking = Tracking.objects.get(
                     investor=investor, target_type=target_type, project=project
                 )
+
             created = False
 
         resp_serializer = TrackingResponseSerializer(
@@ -95,6 +100,11 @@ class InvestorTrackingListView(generics.ListAPIView):
         qs = Tracking.objects.select_related('startup', 'project').filter(
             investor=investor
         )
-        if type_param in [TrackingTargetType.STARTUP, TrackingTargetType.PROJECT]:
+        if type_param:
+            if type_param not in [
+                TrackingTargetType.STARTUP,
+                TrackingTargetType.PROJECT,
+            ]:
+                raise ValidationError({'type': 'Invalid type parameter.'})
             qs = qs.filter(target_type=type_param)
         return qs.order_by('-created_at')
