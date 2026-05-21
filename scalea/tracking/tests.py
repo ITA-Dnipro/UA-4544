@@ -180,7 +180,7 @@ class InvestmentModelTests(TestCase):
         self.assertEqual(inv.investor, self.investor)
         self.assertEqual(inv.status, InvestmentStatus.COMMITTED)
         self.assertEqual(self.investor.tracking_investments.count(), 1)
-        self.assertEqual(self.project.investments.count(), 1)
+        self.assertEqual(self.project.tracking_investments.count(), 1)
         self.assertEqual(inv.investor.user.username, 'investor1')
 
 

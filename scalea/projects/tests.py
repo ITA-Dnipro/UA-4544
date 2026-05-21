@@ -170,7 +170,7 @@ class ProjectAPITests(APITestCase):
         Investment.objects.create(
             investor_profile=self.investor_profile,
             project=project,
-            amount_commited=1000,
+            amount_committed=1000,
         )
 
         response = self.client.get(url)
