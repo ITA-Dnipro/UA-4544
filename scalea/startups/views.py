@@ -14,6 +14,7 @@ from rest_framework.permissions import (
     AllowAny,
     IsAuthenticated,
     IsAuthenticatedOrReadOnly,
+    BasePermission, SAFE_METHODS
 )
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,7 +27,14 @@ from startups.serializers import (
     StartupPublicProfileSerializer,
 )
 
-
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user and request.user.is_authenticated and (
+            request.user.is_staff or request.user.is_superuser
+        )
+        
 class StartupListView(generics.ListAPIView):
     serializer_class = StartupPublicProfileSerializer
 
@@ -177,11 +185,11 @@ class PublishProfileView(APIView):
 class RegionListCreateView(generics.ListCreateAPIView):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class RegionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer
     lookup_field = 'pk'
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAdminOrReadOnly]
