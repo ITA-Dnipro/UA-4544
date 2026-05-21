@@ -1,4 +1,6 @@
+from investors.models import InvestorProfile
 from rest_framework import serializers
+from tracking.models import Tracking, TrackingTargetType
 
 from projects.models import PROJECT_ACTIVE_STATUSES, Project
 
@@ -20,6 +22,7 @@ class ProjectCardSerializer(serializers.ModelSerializer):
 
 class ProjectDetailSerializer(serializers.ModelSerializer):
     startup = serializers.PrimaryKeyRelatedField(read_only=True)
+    is_tracked = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -35,5 +38,21 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'raised_amount',
             'currency',
             'visibility',
+            'is_tracked',
         ]
         read_only_fields = ['id', 'slug', 'raised_amount']
+
+    def get_is_tracked(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        user = request.user
+        if not user.is_investor:
+            return False
+        try:
+            investor = user.investorprofile
+        except (AttributeError, InvestorProfile.DoesNotExist):
+            return False
+        return Tracking.objects.filter(
+            investor=investor, target_type=TrackingTargetType.PROJECT, project=obj
+        ).exists()

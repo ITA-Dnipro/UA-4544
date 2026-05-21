@@ -20,6 +20,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from startups.views import PublishProfileView
+from tracking.views import InvestorTrackingListView
 from users.views import UniversalProfileDetailView
 
 
@@ -31,6 +32,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/health/', health_check),
     path('api/auth/', include('users.urls')),
+    path('api/admin/users/', include('users.admin_urls')),
     path('api/content/landing/', LandingContentAPIView.as_view()),
     path('api/startups/', include('startups.urls')),
     path('api/users/', include('investors.urls')),
@@ -53,4 +55,10 @@ urlpatterns = [
     ),
     path('api/projects/', include('projects.urls')),
     path('api/investors/', include('investors.urls')),
+    path('api/tracking/', include('tracking.urls')),
+    path(
+        'api/investors/<int:investor_id>/tracking/',
+        InvestorTrackingListView.as_view(),
+        name='investor-tracking-list',
+    ),
 ]

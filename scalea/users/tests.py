@@ -1,13 +1,14 @@
 import re
+from datetime import timedelta
 from unittest.mock import patch
 
 import requests as req_lib
-from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from investors.models import InvestorProfile
@@ -18,9 +19,7 @@ from startups.models import StartupProfile
 
 from users.tokens import password_reset_token
 
-from .models import PasswordResetAudit
-
-User = get_user_model()
+from .models import PasswordResetAudit, User
 
 
 class UserModelTests(TestCase):
@@ -41,6 +40,7 @@ class UserModelTests(TestCase):
         self.assertTrue(user.is_verified)
 
 
+@override_settings(RECAPTCHA_SECRET_KEY='')
 class RegistrationAPITests(TestCase):
     def setUp(self):
         cache.clear()
@@ -80,6 +80,26 @@ class RegistrationAPITests(TestCase):
         self.assertTrue(
             InvestorProfile.objects.filter(user__email='investor@example.com').exists()
         )
+
+    def test_org_admin_registration_sends_pending_approval_email(self):
+        response = self.client.post(
+            self.url,
+            {
+                'email': 'new-org-admin@example.com',
+                'password': 'StrongPassword123!',
+                'role': 'org_admin',
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['new-org-admin@example.com'])
+        self.assertEqual(
+            mail.outbox[0].subject,
+            'Welcome to Scalea — Org-Admin request pending approval',
+        )
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertEqual(mail.outbox[0].alternatives[0][1], 'text/html')
 
     def test_registration_duplicate_email_returns_201_and_masks_existence(self):
         existing_email = 'startup@example.com'
@@ -304,6 +324,13 @@ class PasswordResetConfirmViewTest(APITestCase):
         self.combined_token = f'{self.uid}.{self.token}'
         self.url = '/api/auth/password-reset/confirm/'
 
+        PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(self.token),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
     def test_valid_token_changes_password(self):
         response = self.client.post(
             self.url,
@@ -319,13 +346,15 @@ class PasswordResetConfirmViewTest(APITestCase):
     def test_password_reset_revokes_existing_refresh_tokens(self):
         refresh = str(RefreshToken.for_user(self.user))
 
-        self.client.post(
+        reset_response = self.client.post(
             self.url,
             {
                 'token': self.combined_token,
                 'password': 'NewP@ssword1',
             },
         )
+        self.assertEqual(reset_response.status_code, status.HTTP_200_OK)
+
         refresh_response = self.client.post(
             '/api/auth/refresh/',
             {'refresh': refresh},
@@ -528,6 +557,7 @@ class TestLoginApi(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+@override_settings(RECAPTCHA_SECRET_KEY='')
 class RefreshAndLogoutApiTests(APITestCase):
     def setUp(self):
         cache.clear()
@@ -701,3 +731,199 @@ class RegisterSecurityTests(APITestCase):
         cache.delete('throttle_register_127.0.0.1')
         response = self.client.post(self.url, other_data, format='json')
         self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class AdminOrgAdminModerationTests(APITestCase):
+    def setUp(self):
+        self.superadmin = User.objects.create_user(
+            email='superadmin@example.com',
+            username='superadmin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_superuser=True,
+            is_staff=True,
+        )
+        self.org_admin_pending = User.objects.create_user(
+            email='pending-org-admin@example.com',
+            username='pending-org-admin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_org_admin=True,
+            is_verified=False,
+        )
+        self.org_admin_verified = User.objects.create_user(
+            email='verified-org-admin@example.com',
+            username='verified-org-admin@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_org_admin=True,
+            is_verified=True,
+        )
+        self.investor_user = User.objects.create_user(
+            email='investor-only@example.com',
+            username='investor-only@example.com',
+            password='StrongPass123!',
+            is_active=True,
+            is_investor=True,
+        )
+        self.list_url = reverse('admin-user-moderation-list')
+
+    def test_superadmin_can_list_pending_org_admin_requests(self):
+        self.client.force_authenticate(user=self.superadmin)
+
+        response = self.client.get(
+            self.list_url,
+            {'role': 'org_admin', 'is_verified': 'false'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.org_admin_pending.id)
+        self.assertFalse(response.data[0]['is_verified'])
+        self.assertTrue(response.data[0]['is_org_admin'])
+
+    def test_superadmin_can_verify_org_admin(self):
+        self.client.force_authenticate(user=self.superadmin)
+        verify_url = reverse(
+            'verify-org-admin', kwargs={'pk': self.org_admin_pending.id}
+        )
+
+        response = self.client.patch(verify_url, {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.org_admin_pending.refresh_from_db()
+        self.assertTrue(self.org_admin_pending.is_verified)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.org_admin_pending.email])
+        self.assertEqual(
+            mail.outbox[0].subject,
+            'Scalea — Org-Admin verification successful',
+        )
+        self.assertEqual(len(mail.outbox[0].alternatives), 1)
+        self.assertEqual(mail.outbox[0].alternatives[0][1], 'text/html')
+
+    def test_non_superadmin_cannot_access_moderation_endpoints(self):
+        self.client.force_authenticate(user=self.investor_user)
+        verify_url = reverse(
+            'verify-org-admin', kwargs={'pk': self.org_admin_pending.id}
+        )
+
+        list_response = self.client.get(
+            self.list_url,
+            {'role': 'org_admin', 'is_verified': 'false'},
+            format='json',
+        )
+        verify_response = self.client.patch(verify_url, {}, format='json')
+
+        self.assertEqual(list_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(verify_response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PasswordResetTokenLifecycleTests(APITestCase):
+    """TDD: these tests define the expected lifecycle behaviour.
+    They will fail until the model, views and admin are implemented."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='lifecycle@example.com',
+            email='lifecycle@example.com',
+            password='OldP@ssword1',
+        )
+        self.request_url = '/api/auth/password-reset/'
+        self.confirm_url = '/api/auth/password-reset/confirm/'
+
+        self.combined_token = self._issue_token_record()
+
+    def _issue_token_record(self):
+        raw = password_reset_token.make_token(self.user)
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        record = PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(raw),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+        return record, f'{uid}.{raw}'
+
+    def test_token_can_be_used_once(self):
+        _record, combined = self._issue_token_record()
+
+        first = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+        second = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'AnotherP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_successful_confirm_marks_token_used(self):
+        record, combined = self._issue_token_record()
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        record.refresh_from_db()
+        self.assertIsNotNone(record.used_at)
+
+    def test_revoked_token_fails_confirm(self):
+        record, combined = self._issue_token_record()
+        record.revoked = True
+        record.save(update_fields=['revoked'])
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_expired_token_fails_confirm(self):
+        record, combined = self._issue_token_record()
+        record.expires_at = timezone.now() - timedelta(seconds=1)
+        record.save(update_fields=['expires_at'])
+
+        response = self.client.post(
+            self.confirm_url,
+            {'token': combined, 'password': 'NewP@ssword1'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('users.views.EmailMultiAlternatives.send')
+    @patch(
+        'rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True
+    )
+    def test_new_request_revokes_previous_active_tokens(
+        self, _mock_throttle, _mock_send
+    ):
+        old_raw = password_reset_token.make_token(self.user)
+        old_record = PasswordResetAudit.objects.create(
+            user=self.user,
+            email=self.user.email,
+            token_hash=PasswordResetAudit.hash_token(old_raw),
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        response = self.client.post(
+            self.request_url,
+            {'email': self.user.email},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        old_record.refresh_from_db()
+        self.assertTrue(old_record.revoked)

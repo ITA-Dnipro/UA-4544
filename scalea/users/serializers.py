@@ -200,3 +200,9 @@ class LogoutSerializer(serializers.Serializer):
 
     def save(self):
         self.validated_data['token_obj'].blacklist()
+
+
+class AdminUserModerationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'is_org_admin', 'is_verified', 'created_at')
