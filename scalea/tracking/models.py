@@ -138,12 +138,12 @@ class Investment(models.Model):
     investor = models.ForeignKey(
         'investors.InvestorProfile',
         on_delete=models.CASCADE,
-        related_name='investments',
+        related_name='tracking_investments',
     )
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.PROTECT,
-        related_name='investments',
+        related_name='tracking_investments',
     )
     status = models.CharField(
         max_length=16,

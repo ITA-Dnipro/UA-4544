@@ -1,12 +1,20 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from projects.models import Project, ProjectVisibility
+from projects.models import Project, ProjectStatus, ProjectVisibility
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 from startups.models import StartupProfile
 
-from investors.models import InvestorProfile, SavedItem, SavedStartup
+from investors.models import (
+    Investment,
+    InvestmentStatus,
+    InvestorProfile,
+    SavedItem,
+    SavedStartup,
+)
 from investors.serializers import SavedItemCardSerializer
 
 User = get_user_model()
@@ -579,3 +587,202 @@ class SavedItemCardSerializerTests(TestCase):
         self.assertEqual(data['tags'], [])
         self.assertTrue(data['is_available'])
         self.assertIsNone(data['unavailable_reason'])
+
+
+class InvestmentAPITests(APITestCase):
+    def setUp(self):
+
+        self.startup_user = User.objects.create_user(
+            username='startup@test.com',
+            email='startup@test.com',
+            password='Password123!',
+            is_startup=True,
+        )
+        self.startup = StartupProfile.objects.create(
+            user=self.startup_user, company_name='Test Startup'
+        )
+        self.project = Project.objects.create(
+            startup=self.startup,
+            title='Test Project',
+            description='desc',
+            target_amount=1_000_000,
+            currency='UAH',
+            status='fundraising',
+            visibility=ProjectVisibility.PUBLIC,
+        )
+
+        self.investor_user = User.objects.create_user(
+            username='investor@test.com',
+            email='investor@test.com',
+            password='Password123!',
+            is_investor=True,
+        )
+        self.investor_profile = InvestorProfile.objects.create(
+            user=self.investor_user, company_name='Test VC'
+        )
+
+        self.non_investor_user = self.startup_user
+
+        self.create_url = '/api/investments/'
+        self.list_url = f'/api/investors/{self.investor_user.id}/investments/'
+
+    def test_create_success_returns_201(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '10000',
+            'currency': 'UAH',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'committed')
+
+    def test_create_unauthenticated_returns_401(self):
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '10000',
+            'currency': 'UAH',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_non_investor_returns_403(self):
+        self.client.force_authenticate(user=self.non_investor_user)
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '10000',
+            'currency': 'UAH',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_invalid_amount_zero_returns_400(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '0',
+            'currency': 'UAH',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_private_project_returns_400(self):
+        self.project.visibility = ProjectVisibility.PRIVATE
+        self.project.save()
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '10000',
+            'currency': 'UAH',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_wrong_currency_returns_400(self):
+        self.client.force_authenticate(user=self.investor_user)
+        payload = {
+            'project_id': str(self.project.pk),
+            'amount_committed': '10000',
+            'currency': 'JPY',
+        }
+        response = self.client.post(self.create_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_own_investments_returns_200(self):
+        self.client.force_authenticate(user=self.investor_user)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_list_other_investor_returns_403(self):
+        other_user = User.objects.create_user(
+            username='other@test.com',
+            email='other@test.com',
+            password='Password123!',
+            is_investor=True,
+        )
+        self.client.force_authenticate(user=other_user)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_patch_by_owner_success_returns_200(self):
+        investment = Investment.objects.create(
+            investor_profile=self.investor_profile,
+            project=self.project,
+            amount_committed='10000',
+            currency='UAH',
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        response = self.client.patch(
+            f'/api/investments/{investment.pk}/',
+            {'amount_invested': '8000', 'status': 'confirmed'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_patch_by_non_owner_returns_403(self):
+        investment = Investment.objects.create(
+            investor_profile=self.investor_profile,
+            project=self.project,
+            amount_committed='10000',
+            currency='UAH',
+        )
+        self.client.force_authenticate(user=self.non_investor_user)
+        response = self.client.patch(
+            f'/api/investments/{investment.pk}/', {'status': 'confirmed'}, format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_patch_finalized_investment_returns_400(self):
+
+        investment = Investment.objects.create(
+            investor_profile=self.investor_profile,
+            project=self.project,
+            amount_committed='10000',
+            currency='UAH',
+            status=InvestmentStatus.CONFIRMED,
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        response = self.client.patch(
+            f'/api/investments/{investment.pk}/',
+            {'amount_invested': '5000'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_confirmed_updates_project_raised_amount(self):
+        investment = Investment.objects.create(
+            investor_profile=self.investor_profile,
+            project=self.project,
+            amount_committed='10000',
+            currency='UAH',
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        response = self.client.patch(
+            f'/api/investments/{investment.pk}/',
+            {'amount_invested': '8000', 'status': 'confirmed'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.raised_amount, Decimal('8000'))
+
+    def test_patch_confirmed_sets_project_funded_when_target_reached(self):
+        self.project.target_amount = Decimal('10000')
+        self.project.save()
+
+        investment = Investment.objects.create(
+            investor_profile=self.investor_profile,
+            project=self.project,
+            amount_committed='10000',
+            currency='UAH',
+        )
+        self.client.force_authenticate(user=self.investor_user)
+        self.client.patch(
+            f'/api/investments/{investment.pk}/',
+            {'amount_invested': '10000', 'status': 'confirmed'},
+            format='json',
+        )
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.status, ProjectStatus.FUNDED)
