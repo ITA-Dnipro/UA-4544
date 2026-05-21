@@ -11,10 +11,10 @@ from rest_framework.generics import (
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import (
+    SAFE_METHODS,
     AllowAny,
+    BasePermission,
     IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-    BasePermission, SAFE_METHODS
 )
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,14 +27,15 @@ from startups.serializers import (
     StartupPublicProfileSerializer,
 )
 
+
 class IsAdminOrReadOnly(BasePermission):
-    def has_permission(self, request, view):
+    def has_permission(self, request, _view):
         if request.method in SAFE_METHODS:
             return True
         return request.user and request.user.is_authenticated and (
             request.user.is_staff or request.user.is_superuser
         )
-        
+
 class StartupListView(generics.ListAPIView):
     serializer_class = StartupPublicProfileSerializer
 
