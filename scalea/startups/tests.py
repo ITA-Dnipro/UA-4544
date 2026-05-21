@@ -537,3 +537,5 @@ class RegionAPITests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
             status.HTTP_403_FORBIDDEN,
         ])
+
+
