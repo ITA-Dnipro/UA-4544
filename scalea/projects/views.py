@@ -132,8 +132,9 @@ class AdminProjectModerationViewSet(viewsets.GenericViewSet):
     permission_classes = [IsOrgAdmin]
 
     @action(detail=True, methods=['patch'], url_path='moderate')
-    def moderate(self, request, _pk=None):
-        project = self.get_object()
+    def moderate(self, request, pk=None):
+        project = self.get_queryset().get(pk=pk)
+        self.check_object_permissions(request, project)
         serializer = ProjectModerateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
