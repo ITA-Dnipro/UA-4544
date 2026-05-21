@@ -6,10 +6,16 @@ from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .models import Tracking, TrackingTargetType
-from .serializers import TrackingCreateSerializer, TrackingResponseSerializer
+from .serializers import (
+    InterestResponseSerializer,
+    InterestSerializer,
+    TrackingCreateSerializer,
+    TrackingResponseSerializer,
+)
 
 
 class TrackingPageNumberPagination(PageNumberPagination):
@@ -124,3 +130,27 @@ class InvestorTrackingListView(generics.ListAPIView):
                 raise ValidationError({'type': 'Invalid type parameter.'})
             qs = qs.filter(target_type=type_param)
         return qs.order_by('-created_at')
+
+
+class InterestCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'interest'
+
+    def post(self, request):
+        serializer = InterestSerializer(
+            data=request.data,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        interest = serializer.save()
+
+        response_serializer = InterestResponseSerializer(interest)
+
+        return Response(
+            response_serializer.data,
+            status=(
+                status.HTTP_201_CREATED if serializer.created else status.HTTP_200_OK
+            ),
+        )

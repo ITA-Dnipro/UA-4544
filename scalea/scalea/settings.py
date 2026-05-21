@@ -184,6 +184,7 @@ REST_FRAMEWORK = {
         'refresh': '10/minute',
         'logout': '10/minute',
         'password_reset': '5/hour',
+        'interest': '30/hour',
     },
 }
 
