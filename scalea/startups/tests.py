@@ -484,10 +484,13 @@ class RegionAPITests(APITestCase):
     def test_create_region_anonymous_forbidden(self):
         url = '/api/startups/regions/'
         response = self.client.post(url, {'name': 'Odesa region'}, format='json')
-        self.assertIn(response.status_code, [
-            status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-        ])
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )
 
     def test_create_region_duplicate_name_returns_400(self):
         self.client.force_authenticate(user=self.admin)
@@ -512,10 +515,13 @@ class RegionAPITests(APITestCase):
     def test_patch_region_anonymous_forbidden(self):
         url = f'/api/startups/regions/{self.region.pk}/'
         response = self.client.patch(url, {'name': 'Hacked'}, format='json')
-        self.assertIn(response.status_code, [
-            status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-        ])
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )
 
     def test_delete_region_as_admin(self):
         self.client.force_authenticate(user=self.admin)
@@ -533,9 +539,10 @@ class RegionAPITests(APITestCase):
     def test_delete_region_anonymous_forbidden(self):
         url = f'/api/startups/regions/{self.region.pk}/'
         response = self.client.delete(url)
-        self.assertIn(response.status_code, [
-            status.HTTP_401_UNAUTHORIZED,
-            status.HTTP_403_FORBIDDEN,
-        ])
-
-
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )
