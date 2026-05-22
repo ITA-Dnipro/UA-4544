@@ -251,7 +251,7 @@ class InterestSerializer(serializers.Serializer):
 
 
 class InterestResponseSerializer(serializers.ModelSerializer):
-    investor = serializers.PrimaryKeyRelatedField(read_only=True)
+    investor = serializers.IntegerField(source='investor.user_id', read_only=True)
     project_id = serializers.UUIDField(source='project.id', read_only=True)
     status = serializers.ChoiceField(
         choices=InterestStatus.choices,

@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.test.utils import override_settings
 from investors.models import InvestorProfile
 from projects.models import Project, ProjectVisibility
 from rest_framework import status
@@ -373,6 +376,10 @@ class TrackingAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    FRONTEND_URL='https://app.scalea.test',
+)
 class InterestAPITests(APITestCase):
     def setUp(self):
         self.investor_user = User.objects.create_user(
@@ -408,21 +415,31 @@ class InterestAPITests(APITestCase):
 
     def test_express_interest_success(self):
         self.authenticate()
-        response = self.client.post(
-            self.url,
-            {
-                'project_id': str(self.project.pk),
-                'message': 'I am interested in learning more',
-                'contact_opt_in': True,
-            },
-            format='json',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['project_id'], str(self.project.pk))
-        self.assertEqual(response.data['investor'], self.investor.pk)
+        self.assertEqual(response.data['investor'], self.investor_user.id)
         self.assertEqual(response.data['status'], InterestStatus.EXPRESSED)
         self.assertEqual(Interest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.startup_user.email])
+        self.assertEqual(mail.outbox[0].reply_to, [self.investor_user.email])
+        self.assertIn('Test Project', mail.outbox[0].subject)
+        self.assertIn(self.investor_user.email, mail.outbox[0].body)
+        self.assertIn(
+            f'https://app.scalea.test/investors/{self.investor_user.id}',
+            mail.outbox[0].body,
+        )
 
     def test_express_interest_duplicate_returns_200(self):
         self.authenticate()
@@ -446,6 +463,51 @@ class InterestAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['project_id'], str(self.project.pk))
         self.assertEqual(Interest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_express_interest_without_contact_opt_in_hides_contact_email(self):
+        self.authenticate()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': False,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].reply_to, [])
+        self.assertNotIn(self.investor_user.email, mail.outbox[0].body)
+
+    @patch('tracking.views.logger.exception')
+    @patch('tracking.views.EmailMultiAlternatives.send')
+    def test_express_interest_email_failure_does_not_fail_request(
+        self,
+        mock_send,
+        mock_logger_exception,
+    ):
+        mock_send.side_effect = Exception('SMTP unavailable')
+        self.authenticate()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Interest.objects.count(), 1)
+        mock_send.assert_called_once_with(fail_silently=False)
+        mock_logger_exception.assert_called_once()
 
     def test_express_interest_archived_reactivates(self):
         self.authenticate()
@@ -457,21 +519,24 @@ class InterestAPITests(APITestCase):
             status=InterestStatus.ARCHIVED,
         )
 
-        response = self.client.post(
-            self.url,
-            {
-                'project_id': str(self.project.pk),
-                'message': 'I am interested again',
-                'contact_opt_in': True,
-            },
-            format='json',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested again',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         interest.refresh_from_db()
         self.assertEqual(interest.status, InterestStatus.EXPRESSED)
         self.assertEqual(interest.message, 'I am interested again')
         self.assertTrue(interest.contact_opt_in)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.startup_user.email])
 
     def test_express_interest_unauthenticated_returns_401(self):
         response = self.client.post(

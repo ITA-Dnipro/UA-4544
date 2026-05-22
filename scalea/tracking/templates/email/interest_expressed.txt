@@ -1,0 +1,13 @@
+{{ investor_company_name }} expressed interest in {{ project_title }}.
+
+View investor profile:
+{{ investor_profile_url }}
+
+Message:
+{% if message %}{{ message }}{% else %}(no message provided){% endif %}
+
+{% if contact_opt_in %}
+Contact email: {{ investor_email }}
+{% else %}
+The investor did not opt in to share direct contact details.
+{% endif %}
