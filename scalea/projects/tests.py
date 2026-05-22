@@ -168,7 +168,7 @@ class ProjectAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor,
             project=project,
             amount_committed=1000,
         )
