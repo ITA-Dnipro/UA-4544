@@ -437,7 +437,7 @@ class InterestAPITests(APITestCase):
         self.assertIn('Test Project', mail.outbox[0].subject)
         self.assertIn(self.investor_user.email, mail.outbox[0].body)
         self.assertIn(
-            f'https://app.scalea.test/investors/{self.investor_user.id}',
+            f'https://app.scalea.test/profiles/{self.investor_user.id}',
             mail.outbox[0].body,
         )
 
