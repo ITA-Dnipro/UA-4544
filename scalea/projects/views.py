@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db import models
+from django.db import models, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework import permissions, viewsets
@@ -132,9 +132,8 @@ class AdminProjectModerationViewSet(viewsets.GenericViewSet):
     permission_classes = [IsOrgAdmin]
 
     @action(detail=True, methods=['patch'], url_path='moderate')
-    def moderate(self, request, pk=None):
-        project = self.get_queryset().get(pk=pk)
-        self.check_object_permissions(request, project)
+    def moderate(self, request, *_args, **_kwargs):
+        project = self.get_object()
         serializer = ProjectModerateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -153,7 +152,6 @@ class AdminProjectModerationViewSet(viewsets.GenericViewSet):
             project.moderation_reason = reason
             changes['moderation_status'] = ProjectModerationStatus.REJECTED
             changes['reason'] = reason
-            send_project_rejected_email(project, reason)
         elif action_name == 'flag':
             project.moderation_status = ProjectModerationStatus.FLAGGED
             project.moderation_reason = ''
@@ -169,16 +167,24 @@ class AdminProjectModerationViewSet(viewsets.GenericViewSet):
             changes['visibility'] = visibility
 
         project.last_moderated_at = timezone.now()
-        project.save(
-            update_fields=[
-                'moderation_status',
-                'moderation_reason',
-                'deleted_at',
-                'visibility',
-                'last_moderated_at',
-                'updated_at',
-            ]
-        )
+        with transaction.atomic():
+            project.save(
+                update_fields=[
+                    'moderation_status',
+                    'moderation_reason',
+                    'deleted_at',
+                    'visibility',
+                    'last_moderated_at',
+                    'updated_at',
+                ]
+            )
 
-        ProjectAudit.objects.create(project=project, user=request.user, changes=changes)
+            ProjectAudit.objects.create(
+                project=project, user=request.user, changes=changes
+            )
+
+            if action_name == 'reject':
+                transaction.on_commit(
+                    lambda: send_project_rejected_email(project, reason)
+                )
         return Response(AdminProjectSerializer(project).data)

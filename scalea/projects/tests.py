@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase
@@ -295,6 +296,32 @@ class AdminProjectModerationTests(APITestCase):
         self.assertEqual(self.project.moderation_reason, reason)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(reason, mail.outbox[0].body)
+
+    def test_reject_rolls_back_and_does_not_send_email_if_audit_creation_fails(self):
+        self.client.force_authenticate(user=self.org_admin)
+        reason = 'Incomplete financial projections'
+
+        with (
+            patch(
+                'projects.views.ProjectAudit.objects.create',
+                side_effect=RuntimeError('audit write failed'),
+            ),
+            patch('projects.views.send_project_rejected_email') as mocked_email,
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.patch(
+                    self.moderate_url,
+                    {'action': 'reject', 'reason': reason},
+                    format='json',
+                )
+
+            mocked_email.assert_not_called()
+
+        self.project.refresh_from_db()
+        self.assertEqual(
+            self.project.moderation_status, ProjectModerationStatus.PENDING
+        )
+        self.assertEqual(self.project.moderation_reason, '')
 
     def test_admin_can_change_visibility_delete_and_restore(self):
         self.client.force_authenticate(user=self.org_admin)
