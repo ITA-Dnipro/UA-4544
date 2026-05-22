@@ -1,15 +1,29 @@
+import hashlib
+import logging
+
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from investors.models import InvestorProfile
 from projects.permissions import ProjectVisibilityPermission
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .models import Tracking, TrackingTargetType
-from .serializers import TrackingCreateSerializer, TrackingResponseSerializer
+from .serializers import (
+    InterestResponseSerializer,
+    InterestSerializer,
+    TrackingCreateSerializer,
+    TrackingResponseSerializer,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class TrackingPageNumberPagination(PageNumberPagination):
@@ -124,3 +138,77 @@ class InvestorTrackingListView(generics.ListAPIView):
                 raise ValidationError({'type': 'Invalid type parameter.'})
             qs = qs.filter(target_type=type_param)
         return qs.order_by('-created_at')
+
+
+class InterestCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'interest'
+
+    def post(self, request):
+        serializer = InterestSerializer(
+            data=request.data,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        interest = serializer.save()
+        if serializer.created or serializer.reactivated:
+            transaction.on_commit(lambda: self._send_interest_email(interest))
+
+        response_serializer = InterestResponseSerializer(interest)
+
+        return Response(
+            response_serializer.data,
+            status=(
+                status.HTTP_201_CREATED if serializer.created else status.HTTP_200_OK
+            ),
+        )
+
+    def _send_interest_email(self, interest):
+        recipient = interest.project.startup.user.email
+        if not recipient:
+            return
+
+        context = {
+            'investor_company_name': (
+                interest.investor.company_name
+                or interest.investor.user.email
+                or 'An investor'
+            ),
+            'investor_email': interest.investor.user.email,
+            'investor_profile_url': self._build_investor_profile_url(interest),
+            'project_title': interest.project.title,
+            'message': interest.message,
+            'contact_opt_in': interest.contact_opt_in,
+        }
+        email_kwargs = {
+            'subject': f'New investor interest in {interest.project.title}',
+            'body': render_to_string('email/interest_expressed.txt', context),
+            'from_email': settings.DEFAULT_FROM_EMAIL,
+            'to': [recipient],
+        }
+        if interest.contact_opt_in:
+            email_kwargs['reply_to'] = [interest.investor.user.email]
+
+        email_msg = EmailMultiAlternatives(**email_kwargs)
+        email_msg.attach_alternative(
+            render_to_string('email/interest_expressed.html', context),
+            'text/html',
+        )
+
+        try:
+            email_msg.send(fail_silently=False)
+        except Exception:
+            logger.exception(
+                'Failed to send interest email to %s',
+                _mask_email_for_log(recipient),
+            )
+
+    def _build_investor_profile_url(self, interest):
+        frontend_url = settings.FRONTEND_URL.rstrip('/')
+        return f'{frontend_url}/profiles/{interest.investor.user_id}'
+
+
+def _mask_email_for_log(email):
+    return hashlib.sha256(email.encode()).hexdigest()[:10] + '...'
