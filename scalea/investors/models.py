@@ -25,9 +25,10 @@ class InvestmentStatus(models.TextChoices):
 
 
 class Investment(models.Model):
-    investor_profile = models.ForeignKey(
-        InvestorProfile, on_delete=models.CASCADE, related_name='investments'
+    investor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='investments'
     )
+
     project = models.ForeignKey(
         'projects.Project', on_delete=models.PROTECT, related_name='investments'
     )
@@ -48,7 +49,7 @@ class Investment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'{self.investor_profile} → {self.project} ({self.amount_committed} {self.currency})'
+        return f'{self.investor} → {self.project} ({self.amount_committed} {self.currency})'
 
 
 class SavedStartup(models.Model):

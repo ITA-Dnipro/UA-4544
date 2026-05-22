@@ -1,13 +1,31 @@
 from django.db.models import F
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from projects.models import Project, ProjectStatus
+from projects.models import Project, ProjectAudit, ProjectStatus
 
 from .models import Investment, InvestmentStatus
 
+_FINALIZED = (InvestmentStatus.CONFIRMED, InvestmentStatus.CANCELLED)
 
-@receiver(post_save, sender=Investment, dispatch_uid='investment_confirmed_handler')
-def on_investment_confirmed(sender, instance, **_kwargs):  # noqa: ARG001
+
+@receiver(post_save, sender=Investment, dispatch_uid='investment_status_handler')
+def on_investment_status_changed(sender, instance, **_kwargs):  # noqa: ARG001
+
+    if instance.status not in _FINALIZED:
+        return
+
+    ProjectAudit.objects.create(
+        project_id=instance.project_id,
+        user=instance.investor,
+        changes={
+            'event': f'investment_{instance.status}',
+            'investment_id': str(instance.pk),
+            'amount_invested': (
+                str(instance.amount_invested) if instance.amount_invested else None
+            ),
+            'currency': instance.currency,
+        },
+    )
 
     if instance.status != InvestmentStatus.CONFIRMED or not instance.amount_invested:
         return

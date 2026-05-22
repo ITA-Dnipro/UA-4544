@@ -26,7 +26,7 @@ class InvestorPublicProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_investments_count(self, obj):
-        return obj.investments.count()
+        return Investment.objects.filter(investor=obj.user).count()
 
     def get_saved_startups_count(self, obj):
         return obj.savedstartup_set.count()
@@ -210,6 +210,7 @@ class InvestmentSerializer(serializers.ModelSerializer):
         model = Investment
         fields = [
             'id',
+            'investor',
             'project',
             'amount_committed',
             'amount_invested',

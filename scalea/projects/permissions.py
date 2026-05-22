@@ -47,7 +47,7 @@ class ProjectVisibilityPermission(permissions.BasePermission):
             return (
                 obj.startup.user == request.user
                 or request.user.is_org_admin
-                or obj.investments.filter(investor_profile__user=request.user).exists()
+                or obj.investments.filter(investor=request.user).exists()
             )
 
         return obj.startup.user == request.user or request.user.is_org_admin

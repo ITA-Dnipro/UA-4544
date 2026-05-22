@@ -122,10 +122,8 @@ class InvestmentCreateView(APIView):
         serializer = InvestmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        investor_profile = get_object_or_404(InvestorProfile, user=request.user)
-
         investment = Investment.objects.create(
-            investor_profile=investor_profile,
+            investor=request.user,
             project=serializer.validated_data['project_id'],
             amount_committed=serializer.validated_data['amount_committed'],
             currency=serializer.validated_data['currency'],
@@ -148,13 +146,19 @@ class InvestorInvestmentListView(APIView):
                 {'detail': 'You can only view your own investments.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        investor = get_object_or_404(InvestorProfile, user__id=investor_id)
-        investments = investor.investments.select_related('project').order_by(
-            '-created_at'
+        investments = (
+            Investment.objects.filter(investor__id=investor_id)
+            .select_related('project')
+            .order_by('-created_at')
         )
 
-        return Response(InvestmentSerializer(investments, many=True).data)
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        paginator.page_size_query_param = 'page_size'
+        paginated = paginator.paginate_queryset(investments, request)
+        return paginator.get_paginated_response(
+            InvestmentSerializer(paginated, many=True).data
+        )
 
 
 class InvestmentUpdateView(APIView):
@@ -177,4 +181,5 @@ class InvestmentUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
+        investment.refresh_from_db()
         return Response(InvestmentSerializer(investment).data)

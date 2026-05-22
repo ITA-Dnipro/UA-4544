@@ -706,7 +706,7 @@ class InvestmentAPITests(APITestCase):
 
     def test_patch_by_owner_success_returns_200(self):
         investment = Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor_user,
             project=self.project,
             amount_committed='10000',
             currency='UAH',
@@ -721,7 +721,7 @@ class InvestmentAPITests(APITestCase):
 
     def test_patch_by_non_owner_returns_403(self):
         investment = Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor_user,
             project=self.project,
             amount_committed='10000',
             currency='UAH',
@@ -735,7 +735,7 @@ class InvestmentAPITests(APITestCase):
     def test_patch_finalized_investment_returns_400(self):
 
         investment = Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor_user,
             project=self.project,
             amount_committed='10000',
             currency='UAH',
@@ -751,7 +751,7 @@ class InvestmentAPITests(APITestCase):
 
     def test_patch_confirmed_updates_project_raised_amount(self):
         investment = Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor_user,
             project=self.project,
             amount_committed='10000',
             currency='UAH',
@@ -772,7 +772,7 @@ class InvestmentAPITests(APITestCase):
         self.project.save()
 
         investment = Investment.objects.create(
-            investor_profile=self.investor_profile,
+            investor=self.investor_user,
             project=self.project,
             amount_committed='10000',
             currency='UAH',
