@@ -62,4 +62,5 @@ urlpatterns = [
         InvestorTrackingListView.as_view(),
         name='investor-tracking-list',
     ),
+    path('api/investments/', include('investors.investment_urls')),
 ]

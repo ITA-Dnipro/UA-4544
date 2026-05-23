@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from projects.models import Project
 from rest_framework import status
@@ -7,8 +8,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from startups.models import StartupProfile
 
-from .models import InvestorProfile, SavedItem
+from .models import Investment, InvestmentStatus, InvestorProfile, SavedItem
+from .permissions import IsInvestmentOwnerOrAdmin
 from .serializers import (
+    InvestmentCreateSerializer,
+    InvestmentSerializer,
+    InvestmentUpdateSerializer,
     SavedItemCardSerializer,
     SavedItemCreateSerializer,
     SavedItemResponseSerializer,
@@ -102,3 +107,79 @@ class SavedItemDetailView(APIView):
         saved_item.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InvestmentCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_investor:
+            return Response(
+                {'detail': 'Only investors can commit investments.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = InvestmentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        investment = Investment.objects.create(
+            investor=request.user,
+            project=serializer.validated_data['project_id'],
+            amount_committed=serializer.validated_data['amount_committed'],
+            currency=serializer.validated_data['currency'],
+            meta=serializer.validated_data.get('meta', {}),
+            status=InvestmentStatus.COMMITTED,
+        )
+
+        return Response(
+            InvestmentSerializer(investment).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InvestorInvestmentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, investor_id):
+        if request.user.id != investor_id and not request.user.is_superuser:
+            return Response(
+                {'detail': 'You can only view your own investments.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        investments = (
+            Investment.objects.filter(investor__id=investor_id)
+            .select_related('project')
+            .order_by('-created_at')
+        )
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        paginator.page_size_query_param = 'page_size'
+        paginated = paginator.paginate_queryset(investments, request)
+        return paginator.get_paginated_response(
+            InvestmentSerializer(paginated, many=True).data
+        )
+
+
+class InvestmentUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        investment = get_object_or_404(Investment.objects.select_for_update(), pk=pk)
+
+        permission = IsInvestmentOwnerOrAdmin()
+        if not permission.has_object_permission(request, self, investment):
+            return Response(
+                {'detail': permission.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = InvestmentUpdateSerializer(
+            investment, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        investment.refresh_from_db()
+        return Response(InvestmentSerializer(investment).data)
