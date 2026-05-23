@@ -12,11 +12,11 @@ _FINALIZED = (InvestmentStatus.CONFIRMED, InvestmentStatus.CANCELLED)
 def track_previous_status(sender, instance, **_kwargs):  # noqa: ARG001
 
     if instance.pk:
-        try:
-            old = Investment.objects.get(pk=instance.pk)
-            instance._prev_status = old.status
-        except Investment.DoesNotExist:
-            instance._prev_status = None
+        instance._prev_status = (
+            Investment.objects.filter(pk=instance.pk)
+            .values_list('status', flat=True)
+            .first()
+        )
     else:
         instance._prev_status = None
 
@@ -29,7 +29,7 @@ def on_investment_status_changed(sender, instance, **_kwargs):  # noqa: ARG001
     if instance.status not in _FINALIZED:
         return
 
-    if prev_status == instance.status:
+    if prev_status != InvestmentStatus.COMMITTED:
         return
 
     ProjectAudit.objects.create(
