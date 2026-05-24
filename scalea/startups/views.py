@@ -20,12 +20,16 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import ProfileAudit
+from users.profile_audit import (
+    _build_changes,
+    _profile_snapshot,
+    _restore_profile_value,
+)
+from users.serializers import ProfileAuditSerializer
 
-from startups.diff import _build_changes, _profile_snapshot, _restore_profile_value
 from startups.models import Region, StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
-    ProfileAuditSerializer,
     RegionSerializer,
     StartupProfileUpdateSerializer,
     StartupPublicProfileSerializer,
@@ -220,8 +224,6 @@ class RegionDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RegionSerializer
     lookup_field = 'pk'
     permission_classes = [IsAdminOrReadOnly]
-
-
 
 
 class ProfileHistoryPagination(PageNumberPagination):

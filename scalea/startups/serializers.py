@@ -1,6 +1,5 @@
 from django.utils.html import linebreaks
 from rest_framework import serializers
-from users.models import ProfileAudit
 
 from startups.models import Region, StartupProfile
 
@@ -82,26 +81,3 @@ class StartupProfileUpdateSerializer(serializers.ModelSerializer):
                 'Enter a valid URL starting with http or https.'
             )
         return value
-
-
-class ProfileAuditSerializer(serializers.ModelSerializer):
-    user_id = serializers.SerializerMethodField()
-    profile_id = serializers.IntegerField(source='object_id', read_only=True)
-    profile_type = serializers.SerializerMethodField()
-
-    def get_user_id(self, obj):
-        return obj.user_id
-
-    def get_profile_type(self, obj):
-        return obj.content_type.model
-
-    class Meta:
-        model = ProfileAudit
-        fields = [
-            'id',
-            'profile_type',
-            'profile_id',
-            'user_id',
-            'timestamp',
-            'changes',
-        ]

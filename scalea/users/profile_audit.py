@@ -4,7 +4,6 @@ from decimal import Decimal
 from django.db import models
 from django.utils.dateparse import parse_date, parse_datetime
 from investors.models import InvestorProfile
-
 from startups.models import StartupProfile
 
 STARTUP_AUDITED_PROFILE_FIELDS = [

@@ -31,7 +31,6 @@ from rest_framework_simplejwt.token_blacklist.models import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
-from startups.diff import _build_changes, _profile_snapshot
 from startups.models import StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
@@ -46,6 +45,7 @@ from .metrics import (
 )
 from .models import PasswordResetAudit, ProfileAudit
 from .permissions import IsSuperAdmin
+from .profile_audit import _build_changes, _profile_snapshot
 from .security import (
     clear_login_failures,
     is_login_locked,
