@@ -4,6 +4,8 @@ from projects.models import Project, ProjectStatus, ProjectVisibility
 from projects.permissions import ProjectVisibilityPermission
 from rest_framework import serializers
 from startups.models import StartupProfile
+from tracking.models import TrackingTargetType
+from tracking.serializers import TrackingResponseSerializer
 
 from .models import Investment, InvestmentStatus, InvestorProfile, SavedItem
 
@@ -221,6 +223,55 @@ class InvestmentSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class DashboardProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['id', 'title', 'slug', 'status', 'currency']
+
+
+class DashboardTrackedSerializer(TrackingResponseSerializer):
+    latest_project = serializers.SerializerMethodField()
+
+    class Meta(TrackingResponseSerializer.Meta):
+        fields = [*TrackingResponseSerializer.Meta.fields, 'latest_project']
+
+    def get_latest_project(self, obj):
+        if not self._can_view(obj):
+            return None
+
+        if obj.target_type == TrackingTargetType.PROJECT:
+            project = obj.project
+        else:
+            projects = getattr(obj.startup, 'dashboard_public_projects', [])
+            project = projects[0] if projects else None
+
+        if project is None:
+            return None
+        return DashboardProjectSerializer(project).data
+
+
+class DashboardInvestmentSerializer(serializers.ModelSerializer):
+    investment_id = serializers.IntegerField(source='id', read_only=True)
+    project = DashboardProjectSerializer(read_only=True)
+
+    class Meta:
+        model = Investment
+        fields = [
+            'investment_id',
+            'project',
+            'amount_committed',
+            'amount_invested',
+            'currency',
+            'status',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class DashboardQuerySerializer(serializers.Serializer):
+    since = serializers.DateField(required=False)
 
 
 ALLOWED_CURRENCIES = ['UAH', 'USD', 'EUR', 'GBP']

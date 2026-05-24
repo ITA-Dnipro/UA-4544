@@ -11,6 +11,9 @@ from startups.models import StartupProfile
 from .models import Investment, InvestmentStatus, InvestorProfile, SavedItem
 from .permissions import IsInvestmentOwnerOrAdmin
 from .serializers import (
+    DashboardInvestmentSerializer,
+    DashboardQuerySerializer,
+    DashboardTrackedSerializer,
     InvestmentCreateSerializer,
     InvestmentSerializer,
     InvestmentUpdateSerializer,
@@ -18,6 +21,7 @@ from .serializers import (
     SavedItemCreateSerializer,
     SavedItemResponseSerializer,
 )
+from .services import InvestorDashboardService
 
 
 class SavedItemView(APIView):
@@ -159,6 +163,68 @@ class InvestorInvestmentListView(APIView):
         return paginator.get_paginated_response(
             InvestmentSerializer(paginated, many=True).data
         )
+
+
+class InvestorDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, investor_id):
+        if (
+            request.user.id != investor_id
+            and not request.user.is_staff
+            and not request.user.is_superuser
+        ):
+            return Response(
+                {'detail': 'You can only view your own dashboard.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        investor = get_object_or_404(
+            InvestorProfile.objects.select_related('user'), user_id=investor_id
+        )
+        query_serializer = DashboardQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+
+        service = InvestorDashboardService(investor)
+        summary_data = service.build_summary()
+        return Response(
+            {
+                'investor_id': investor_id,
+                **summary_data,
+                'allocation_by_project': service.allocation_by_project(),
+                'recent_activity': service.recent_activity(
+                    since=query_serializer.validated_data.get('since')
+                ),
+                'attention_required': service.attention_required(),
+                'tracked': self._paginated_section(
+                    request,
+                    service.tracked_queryset(),
+                    DashboardTrackedSerializer,
+                    'tracked',
+                ),
+                'investments': self._paginated_section(
+                    request,
+                    service.investments_queryset(),
+                    DashboardInvestmentSerializer,
+                    'investments',
+                ),
+            }
+        )
+
+    def _paginated_section(self, request, queryset, serializer_class, section):
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        paginator.page_query_param = f'{section}_page'
+        paginator.page_size_query_param = f'{section}_page_size'
+        paginator.max_page_size = 100
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = serializer_class(page, many=True, context={'request': request})
+        return {
+            'count': paginator.page.paginator.count,
+            'next': paginator.get_next_link(),
+            'previous': paginator.get_previous_link(),
+            'results': serializer.data,
+        }
 
 
 class InvestmentUpdateView(APIView):
