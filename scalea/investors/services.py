@@ -77,12 +77,15 @@ class InvestorDashboardService:
             .order_by('-created_at')
         )
 
-    def investments_queryset(self):
-        return (
+    def investments_queryset(self, since=None):
+        investments = (
             Investment.objects.filter(investor=self.investor.user)
             .select_related('project')
             .order_by('-created_at')
         )
+        if since is not None:
+            investments = investments.filter(created_at__date__gte=since)
+        return investments
 
     def allocation_by_project(self):
         if self._project_allocation is not None:

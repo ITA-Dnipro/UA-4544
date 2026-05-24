@@ -184,6 +184,7 @@ class InvestorDashboardView(APIView):
         )
         query_serializer = DashboardQuerySerializer(data=request.query_params)
         query_serializer.is_valid(raise_exception=True)
+        since = query_serializer.validated_data.get('since')
 
         service = InvestorDashboardService(investor)
         summary_data = service.build_summary()
@@ -192,9 +193,7 @@ class InvestorDashboardView(APIView):
                 'investor_id': investor_id,
                 **summary_data,
                 'allocation_by_project': service.allocation_by_project(),
-                'recent_activity': service.recent_activity(
-                    since=query_serializer.validated_data.get('since')
-                ),
+                'recent_activity': service.recent_activity(since=since),
                 'attention_required': service.attention_required(),
                 'tracked': self._paginated_section(
                     request,
@@ -204,7 +203,7 @@ class InvestorDashboardView(APIView):
                 ),
                 'investments': self._paginated_section(
                     request,
-                    service.investments_queryset(),
+                    service.investments_queryset(since=since),
                     DashboardInvestmentSerializer,
                     'investments',
                 ),

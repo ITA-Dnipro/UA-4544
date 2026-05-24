@@ -969,7 +969,8 @@ class InvestorDashboardAPITests(APITestCase):
         self.authenticate()
 
         response = self.client.get(
-            self.url, {'since': (timezone.now().date() - timedelta(days=1)).isoformat()}
+            self.url,
+            {'since': (timezone.now().date() - timedelta(days=1)).isoformat()},
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -983,6 +984,25 @@ class InvestorDashboardAPITests(APITestCase):
         )
         self.assertEqual(response.data['recent_activity'][0]['severity'], 'success')
         self.assertIn('2500.00 UAH', response.data['recent_activity'][0]['summary'])
+
+    def test_dashboard_since_filters_investments_not_current_portfolio(self):
+        Investment.objects.filter(project=self.project).update(
+            created_at=timezone.now() - timedelta(days=4)
+        )
+        self.authenticate()
+
+        response = self.client.get(
+            self.url, {'since': timezone.now().date().isoformat()}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['investments']['count'], 1)
+        self.assertEqual(
+            response.data['investments']['results'][0]['project']['id'],
+            str(self.second_project.id),
+        )
+        self.assertEqual(response.data['summary']['total_committed'], Decimal('15000'))
+        self.assertEqual(len(response.data['allocation_by_project']), 2)
 
     def test_dashboard_activity_includes_public_project_from_tracked_startup(self):
         Investment.objects.filter(project=self.second_project).delete()
