@@ -10,7 +10,8 @@ from projects.models import Project, ProjectAudit, ProjectStatus, ProjectVisibil
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 from startups.models import StartupProfile
-from tracking.models import PortfolioSnapshot, Tracking, TrackingTargetType, ProfileAudit
+from tracking.models import PortfolioSnapshot, Tracking, TrackingTargetType
+from users.models import ProfileAudit
 
 from investors.models import (
     Investment,
