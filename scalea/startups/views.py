@@ -89,26 +89,24 @@ class StartupPublicProfileView(generics.RetrieveUpdateAPIView):
             return StartupProfileUpdateSerializer
         return StartupPublicProfileSerializer
 
-    def perform_update(self, serializer):
-        with transaction.atomic():
-            serializer.save()
-
     def update(self, request, *_args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         before = _profile_snapshot(instance)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        instance.refresh_from_db()
-        after = _profile_snapshot(instance)
-        changes = _build_changes(before, after)
-        if changes:
-            ProfileAudit.objects.create(
-                profile=instance,
-                user=request.user if request.user.is_authenticated else None,
-                changes=changes,
-            )
+
+        with transaction.atomic():
+            serializer.save()
+            instance.refresh_from_db()
+            after = _profile_snapshot(instance)
+            changes = _build_changes(before, after)
+            if changes:
+                ProfileAudit.objects.create(
+                    profile=instance,
+                    user=request.user if request.user.is_authenticated else None,
+                    changes=changes,
+                )
 
         return Response(StartupPublicProfileSerializer(instance).data)
 
