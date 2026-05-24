@@ -1,12 +1,15 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from projects.models import Project, ProjectStatus, ProjectVisibility
+from django.utils import timezone
+from projects.models import Project, ProjectAudit, ProjectStatus, ProjectVisibility
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 from startups.models import StartupProfile
+from tracking.models import PortfolioSnapshot, Tracking, TrackingTargetType
 
 from investors.models import (
     Investment,
@@ -786,3 +789,287 @@ class InvestmentAPITests(APITestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.status, ProjectStatus.FUNDED)
+
+
+class InvestorDashboardAPITests(APITestCase):
+    def setUp(self):
+        self.investor_user = User.objects.create_user(
+            username='dashboard-investor',
+            email='dashboard-investor@example.com',
+            password='Password123!',
+            is_investor=True,
+        )
+        self.investor = InvestorProfile.objects.create(
+            user=self.investor_user,
+            company_name='Dashboard Capital',
+        )
+        self.startup_user = User.objects.create_user(
+            username='dashboard-startup',
+            email='dashboard-startup@example.com',
+            password='Password123!',
+            is_startup=True,
+        )
+        self.startup = StartupProfile.objects.create(
+            user=self.startup_user,
+            company_name='Portfolio Startup',
+        )
+        self.project = Project.objects.create(
+            startup=self.startup,
+            title='Growth Project',
+            description='desc',
+            target_amount=Decimal('100000.00'),
+            currency='UAH',
+            status=ProjectStatus.FUNDRAISING,
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        self.second_project = Project.objects.create(
+            startup=self.startup,
+            title='Second Project',
+            description='desc',
+            target_amount=Decimal('50000.00'),
+            currency='UAH',
+            status=ProjectStatus.MVP,
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        Tracking.objects.create(
+            investor=self.investor,
+            target_type=TrackingTargetType.STARTUP,
+            startup=self.startup,
+        )
+        Tracking.objects.create(
+            investor=self.investor,
+            target_type=TrackingTargetType.PROJECT,
+            project=self.project,
+        )
+        Investment.objects.create(
+            investor=self.investor_user,
+            project=self.project,
+            amount_committed=Decimal('10000.00'),
+            currency='UAH',
+            status=InvestmentStatus.COMMITTED,
+        )
+        Investment.objects.create(
+            investor=self.investor_user,
+            project=self.second_project,
+            amount_committed=Decimal('5000.00'),
+            amount_invested=Decimal('4000.00'),
+            currency='UAH',
+            status=InvestmentStatus.CONFIRMED,
+        )
+        self.url = f'/api/investors/{self.investor_user.id}/dashboard/'
+
+    def authenticate(self, user=None):
+        self.client.force_authenticate(user=user or self.investor_user)
+
+    def test_dashboard_returns_realtime_summary_and_paginated_lists(self):
+        self.authenticate()
+
+        response = self.client.get(
+            self.url, {'tracked_page_size': 1, 'investments_page_size': 1}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['investor_id'], self.investor_user.id)
+        self.assertEqual(response.data['summary']['tracked_count'], 2)
+        self.assertEqual(response.data['summary']['projects_tracked'], 1)
+        self.assertEqual(response.data['summary']['total_committed'], Decimal('15000'))
+        self.assertEqual(response.data['summary']['total_invested'], Decimal('4000'))
+        self.assertEqual(response.data['summary']['active_investments'], 2)
+        self.assertEqual(response.data['summary_meta']['source'], 'realtime')
+        self.assertEqual(response.data['tracked']['count'], 2)
+        self.assertEqual(len(response.data['tracked']['results']), 1)
+        self.assertEqual(response.data['investments']['count'], 2)
+        self.assertEqual(len(response.data['investments']['results']), 1)
+        self.assertIn('latest_project', response.data['tracked']['results'][0])
+        self.assertIn('project', response.data['investments']['results'][0])
+        self.assertEqual(len(response.data['attention_required']), 1)
+        self.assertEqual(
+            response.data['attention_required'][0]['type'], 'commitment_pending'
+        )
+        self.assertEqual(
+            response.data['attention_required'][0]['severity'], 'action_required'
+        )
+
+    def test_dashboard_uses_latest_snapshot_for_financial_totals(self):
+        PortfolioSnapshot.objects.create(
+            investor=self.investor,
+            computed_at=timezone.now(),
+            projects_count=2,
+            total_committed=Decimal('20000.00'),
+            total_invested=Decimal('9000.00'),
+            summary={},
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['total_committed'], Decimal('20000'))
+        self.assertEqual(response.data['summary']['total_invested'], Decimal('9000'))
+        self.assertEqual(response.data['summary_meta']['source'], 'snapshot')
+
+    def test_dashboard_aggregates_investments_and_funding_by_project(self):
+        self.project.raised_amount = Decimal('12000.00')
+        self.project.save(update_fields=['raised_amount'])
+        Investment.objects.create(
+            investor=self.investor_user,
+            project=self.project,
+            amount_committed=Decimal('3000.00'),
+            amount_invested=Decimal('2000.00'),
+            currency='UAH',
+            status=InvestmentStatus.CONFIRMED,
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data['summary']['total_committed'], Decimal('18000.00')
+        )
+        self.assertEqual(response.data['summary']['total_invested'], Decimal('6000.00'))
+        self.assertEqual(response.data['summary']['active_investments'], 3)
+        allocation = next(
+            item
+            for item in response.data['allocation_by_project']
+            if item['project']['id'] == str(self.project.id)
+        )
+        self.assertEqual(allocation['commitments_count'], 2)
+        self.assertEqual(allocation['my_total_committed'], Decimal('13000.00'))
+        self.assertEqual(allocation['my_total_invested'], Decimal('2000.00'))
+        self.assertEqual(allocation['other_investors_invested'], Decimal('10000.00'))
+        self.assertEqual(allocation['project']['target_amount'], Decimal('100000.00'))
+        self.assertEqual(allocation['project']['raised_amount'], Decimal('12000.00'))
+        self.assertEqual(allocation['project']['remaining_amount'], Decimal('88000.00'))
+        self.assertEqual(
+            allocation['project']['funding_progress_percent'], Decimal('12.00')
+        )
+        self.assertEqual(
+            allocation['my_share_of_project_raised_percent'], Decimal('16.67')
+        )
+
+    def test_dashboard_recent_activity_accepts_since_filter(self):
+        old_activity = ProjectAudit.objects.create(
+            project=self.project,
+            user=self.investor_user,
+            changes={'event': 'investment_cancelled'},
+        )
+        ProjectAudit.objects.filter(pk=old_activity.pk).update(
+            timestamp=timezone.now() - timedelta(days=4)
+        )
+        ProjectAudit.objects.create(
+            project=self.project,
+            user=self.investor_user,
+            changes={
+                'event': 'investment_confirmed',
+                'amount_invested': '2500.00',
+                'currency': 'UAH',
+            },
+        )
+        self.authenticate()
+
+        response = self.client.get(
+            self.url,
+            {'since': (timezone.now().date() - timedelta(days=1)).isoformat()},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['recent_activity']), 1)
+        self.assertEqual(
+            response.data['recent_activity'][0]['type'], 'investment_confirmed'
+        )
+        self.assertEqual(response.data['recent_activity'][0]['source'], 'project_audit')
+        self.assertEqual(
+            response.data['recent_activity'][0]['actor_id'], self.investor_user.id
+        )
+        self.assertEqual(response.data['recent_activity'][0]['severity'], 'success')
+        self.assertIn('2500.00 UAH', response.data['recent_activity'][0]['summary'])
+
+    def test_dashboard_since_filters_investments_not_current_portfolio(self):
+        Investment.objects.filter(project=self.project).update(
+            created_at=timezone.now() - timedelta(days=4)
+        )
+        self.authenticate()
+
+        response = self.client.get(
+            self.url, {'since': timezone.now().date().isoformat()}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['investments']['count'], 1)
+        self.assertEqual(
+            response.data['investments']['results'][0]['project']['id'],
+            str(self.second_project.id),
+        )
+        self.assertEqual(response.data['summary']['total_committed'], Decimal('15000'))
+        self.assertEqual(len(response.data['allocation_by_project']), 2)
+
+    def test_dashboard_activity_includes_public_project_from_tracked_startup(self):
+        Investment.objects.filter(project=self.second_project).delete()
+        ProjectAudit.objects.create(
+            project=self.second_project,
+            user=self.startup_user,
+            changes={'status': {'from': 'idea', 'to': 'mvp'}},
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(len(response.data['recent_activity']), 1)
+        self.assertEqual(
+            response.data['recent_activity'][0]['project_id'],
+            str(self.second_project.id),
+        )
+
+    def test_dashboard_activity_does_not_expose_private_tracked_project(self):
+        Investment.objects.all().delete()
+        Tracking.objects.filter(target_type=TrackingTargetType.PROJECT).delete()
+        self.second_project.visibility = ProjectVisibility.PRIVATE
+        self.second_project.save(update_fields=['visibility'])
+        ProjectAudit.objects.create(
+            project=self.second_project,
+            user=self.startup_user,
+            changes={'status': {'from': 'idea', 'to': 'mvp'}},
+        )
+        self.authenticate()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.data['recent_activity'], [])
+
+    def test_dashboard_rejects_other_investor(self):
+        other_user = User.objects.create_user(
+            username='other-dashboard-investor',
+            email='other-dashboard@example.com',
+            password='Password123!',
+            is_investor=True,
+        )
+        self.authenticate(other_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_dashboard_requires_authentication(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_allows_admin(self):
+        admin = User.objects.create_superuser(
+            username='dashboard-admin',
+            email='dashboard-admin@example.com',
+            password='Password123!',
+        )
+        self.authenticate(admin)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_dashboard_rejects_invalid_since_date(self):
+        self.authenticate()
+
+        response = self.client.get(self.url, {'since': 'not-a-date'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
