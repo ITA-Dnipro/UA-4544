@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'messages.apps.MessagesConfig',
     'dashboard',
     'tracking',
+    'uploads'
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -219,3 +220,20 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 EMAIL_REPLY_TO = config('EMAIL_REPLY_TO', default=DEFAULT_FROM_EMAIL)
 PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=300, cast=int)
+
+# Uploads
+MEDIA_ROOT = BASE_DIR / config('UPLOAD_ROOT', default='media')
+MEDIA_URL = config('MEDIA_URL', default='/media/')
+
+UPLOAD_MAX_SIZE_BYTES = config(
+    'UPLOAD_MAX_SIZE_BYTES', default=5 * 1024 * 1024, cast=int
+)
+UPLOAD_ALLOWED_MIME_TYPES = config(
+    'UPLOAD_ALLOWED_MIME_TYPES',
+    default='image/jpeg,image/png,image/svg+xml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    cast=Csv(),
+)
+def media_url_for_path(relative_path: str) -> str:
+    base = MEDIA_URL.rstrip('/')
+    path = relative_path.lstrip('/')
+    return f'{base}/{path}'

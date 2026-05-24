@@ -19,6 +19,8 @@ from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
+from django.conf import settings
+from django.conf.urls.static import static
 from startups.views import PublishProfileView
 from tracking.views import InterestCreateAPIView, InvestorTrackingListView
 from users.views import UniversalProfileDetailView
@@ -63,4 +65,5 @@ urlpatterns = [
         name='investor-tracking-list',
     ),
     path('api/investments/', include('investors.investment_urls')),
+    path('api/uploads/', include('uploads.urls')),
 ]

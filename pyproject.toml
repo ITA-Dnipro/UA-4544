@@ -9,7 +9,8 @@ dependencies = [
   "python-decouple==3.8",
   "psycopg2-binary==2.9.11",
   "djangorestframework-simplejwt==5.5.0",
-  "requests>=2.32.3,<3" 
+  "requests>=2.32.3,<3",
+  "python-magic=="^0.4.27"
 ]
 
 [project.optional-dependencies]
