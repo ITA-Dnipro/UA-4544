@@ -138,12 +138,12 @@ class Investment(models.Model):
     investor = models.ForeignKey(
         'investors.InvestorProfile',
         on_delete=models.CASCADE,
-        related_name='investments',
+        related_name='tracking_investments',
     )
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.PROTECT,
-        related_name='investments',
+        related_name='tracking_investments',
     )
     status = models.CharField(
         max_length=16,
@@ -202,3 +202,44 @@ class PortfolioSnapshot(models.Model):
             ),
         ]
         ordering = ['-computed_at']
+
+
+class InterestStatus(models.TextChoices):
+    EXPRESSED = 'expressed', 'Expressed'
+    CONTACTED = 'contacted', 'Contacted'
+    ARCHIVED = 'archived', 'Archived'
+
+
+class Interest(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    investor = models.ForeignKey(
+        'investors.InvestorProfile',
+        on_delete=models.CASCADE,
+        related_name='interests',
+    )
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        related_name='interests',
+    )
+    message = models.TextField(blank=True)
+    contact_opt_in = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=16,
+        choices=InterestStatus.choices,
+        default=InterestStatus.EXPRESSED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['investor', 'project'],
+                name='uniq_interest_investor_project',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Interest<{self.investor_id} -> {self.project_id} ({self.status})>'

@@ -5,7 +5,7 @@ from projects.models import Project
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from startups.models import StartupProfile
+from startups.models import Region, StartupProfile
 
 User = get_user_model()
 
@@ -426,3 +426,123 @@ class StartupProfileAPITests(APITestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class RegionAPITests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='adminreg',
+            email='adminreg@example.com',
+            password='123qwe!@#',
+            is_staff=True,
+        )
+        self.regular_user = _make_user('reguser', 'reg@example.com')
+        self.region = Region.objects.create(name='Dnipro region')
+
+    def test_list_regions_anonymous(self):
+        url = '/api/startups/regions/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_list_regions_authenticated(self):
+        self.client.force_authenticate(user=self.regular_user)
+        url = '/api/startups/regions/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_region_anonymous(self):
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Dnipro region')
+
+    def test_retrieve_region_returns_correct_fields(self):
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.get(url)
+        self.assertIn('id', response.data)
+        self.assertIn('name', response.data)
+
+    def test_retrieve_nonexistent_region_returns_404(self):
+        url = '/api/startups/regions/99999/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_create_region_as_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        url = '/api/startups/regions/'
+        response = self.client.post(url, {'name': 'Lviv region'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Region.objects.count(), 2)
+
+    def test_create_region_as_regular_user_forbidden(self):
+        self.client.force_authenticate(user=self.regular_user)
+        url = '/api/startups/regions/'
+        response = self.client.post(url, {'name': 'Zaporizhzhia region'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_region_anonymous_forbidden(self):
+        url = '/api/startups/regions/'
+        response = self.client.post(url, {'name': 'Odesa region'}, format='json')
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )
+
+    def test_create_region_duplicate_name_returns_400(self):
+        self.client.force_authenticate(user=self.admin)
+        url = '/api/startups/regions/'
+        response = self.client.post(url, {'name': 'Dnipro region'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_region_as_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.patch(url, {'name': 'Updated Region'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.region.refresh_from_db()
+        self.assertEqual(self.region.name, 'Updated Region')
+
+    def test_patch_region_as_regular_user_forbidden(self):
+        self.client.force_authenticate(user=self.regular_user)
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.patch(url, {'name': 'Hacked'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_patch_region_anonymous_forbidden(self):
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.patch(url, {'name': 'Hacked'}, format='json')
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )
+
+    def test_delete_region_as_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Region.objects.count(), 0)
+
+    def test_delete_region_as_regular_user_forbidden(self):
+        self.client.force_authenticate(user=self.regular_user)
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_region_anonymous_forbidden(self):
+        url = f'/api/startups/regions/{self.region.pk}/'
+        response = self.client.delete(url)
+        self.assertIn(
+            response.status_code,
+            [
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+            ],
+        )

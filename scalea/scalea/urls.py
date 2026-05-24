@@ -20,7 +20,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from startups.views import PublishProfileView
-from tracking.views import InvestorTrackingListView
+from tracking.views import InterestCreateAPIView, InvestorTrackingListView
 from users.views import UniversalProfileDetailView
 
 
@@ -56,10 +56,12 @@ urlpatterns = [
     ),
     path('api/projects/', include('projects.urls')),
     path('api/investors/', include('investors.urls')),
+    path('api/interest/', InterestCreateAPIView.as_view(), name='interest-create'),
     path('api/tracking/', include('tracking.urls')),
     path(
         'api/investors/<int:investor_id>/tracking/',
         InvestorTrackingListView.as_view(),
         name='investor-tracking-list',
     ),
+    path('api/investments/', include('investors.investment_urls')),
 ]

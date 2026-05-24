@@ -1,16 +1,21 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.test.utils import override_settings
 from investors.models import InvestorProfile
-from projects.models import Project
+from projects.models import Project, ProjectVisibility
 from rest_framework import status
 from rest_framework.test import APITestCase
 from startups.models import StartupProfile
 
 from tracking.models import (
+    Interest,
+    InterestStatus,
     Investment,
     InvestmentStatus,
     PortfolioSnapshot,
@@ -174,8 +179,8 @@ class InvestmentModelTests(TestCase):
         self.assertIsNotNone(inv.id)
         self.assertEqual(inv.investor, self.investor)
         self.assertEqual(inv.status, InvestmentStatus.COMMITTED)
-        self.assertEqual(self.investor.investments.count(), 1)
-        self.assertEqual(self.project.investments.count(), 1)
+        self.assertEqual(self.investor.tracking_investments.count(), 1)
+        self.assertEqual(self.project.tracking_investments.count(), 1)
         self.assertEqual(inv.investor.user.username, 'investor1')
 
 
@@ -368,4 +373,248 @@ class TrackingAPITests(APITestCase):
         self.authenticate(self.other_user)
         url = f'/api/investors/{self.investor.pk}/tracking/'
         response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    FRONTEND_URL='https://app.scalea.test',
+)
+class InterestAPITests(APITestCase):
+    def setUp(self):
+        self.investor_user = User.objects.create_user(
+            username='interest_investor',
+            email='interest-investor@example.com',
+            password='pass',
+            is_investor=True,
+        )
+        self.investor = InvestorProfile.objects.create(
+            user=self.investor_user,
+            company_name='Acme Capital',
+        )
+        self.startup_user = User.objects.create_user(
+            username='interest_startup',
+            email='interest-startup@example.com',
+            password='pass',
+            is_startup=True,
+        )
+        self.startup = StartupProfile.objects.create(
+            user=self.startup_user,
+            company_name='Test Startup',
+        )
+        self.project = Project.objects.create(
+            title='Test Project',
+            startup=self.startup,
+            target_amount=Decimal('100000.0'),
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        self.url = '/api/interest/'
+
+    def authenticate(self):
+        self.client.force_authenticate(user=self.investor_user)
+
+    def test_express_interest_success(self):
+        self.authenticate()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['project_id'], str(self.project.pk))
+        self.assertEqual(response.data['investor'], self.investor_user.id)
+        self.assertEqual(response.data['status'], InterestStatus.EXPRESSED)
+        self.assertEqual(Interest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.startup_user.email])
+        self.assertEqual(mail.outbox[0].reply_to, [self.investor_user.email])
+        self.assertIn('Test Project', mail.outbox[0].subject)
+        self.assertIn(self.investor_user.email, mail.outbox[0].body)
+        self.assertIn(
+            f'https://app.scalea.test/profiles/{self.investor_user.id}',
+            mail.outbox[0].body,
+        )
+
+    def test_express_interest_duplicate_returns_200(self):
+        self.authenticate()
+        Interest.objects.create(
+            investor=self.investor,
+            project=self.project,
+            message='Already interested',
+            contact_opt_in=True,
+        )
+
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': str(self.project.pk),
+                'message': 'I am still interested',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['project_id'], str(self.project.pk))
+        self.assertEqual(Interest.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_express_interest_without_contact_opt_in_hides_contact_email(self):
+        self.authenticate()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': False,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].reply_to, [])
+        self.assertNotIn(self.investor_user.email, mail.outbox[0].body)
+
+    @patch('tracking.views.logger.exception')
+    @patch('tracking.views.EmailMultiAlternatives.send')
+    def test_express_interest_email_failure_does_not_fail_request(
+        self,
+        mock_send,
+        mock_logger_exception,
+    ):
+        mock_send.side_effect = Exception('SMTP unavailable')
+        self.authenticate()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested in learning more',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Interest.objects.count(), 1)
+        mock_send.assert_called_once_with(fail_silently=False)
+        mock_logger_exception.assert_called_once()
+
+    def test_express_interest_archived_reactivates(self):
+        self.authenticate()
+        interest = Interest.objects.create(
+            investor=self.investor,
+            project=self.project,
+            message='Old message',
+            contact_opt_in=False,
+            status=InterestStatus.ARCHIVED,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.url,
+                {
+                    'project_id': str(self.project.pk),
+                    'message': 'I am interested again',
+                    'contact_opt_in': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        interest.refresh_from_db()
+        self.assertEqual(interest.status, InterestStatus.EXPRESSED)
+        self.assertEqual(interest.message, 'I am interested again')
+        self.assertTrue(interest.contact_opt_in)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.startup_user.email])
+
+    def test_express_interest_unauthenticated_returns_401(self):
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': str(self.project.pk),
+                'message': 'I am interested in learning more',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_express_interest_missing_project_returns_404(self):
+        self.authenticate()
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': '00000000-0000-0000-0000-000000000000',
+                'message': 'I am interested in learning more',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_express_interest_private_project_returns_404(self):
+        self.authenticate()
+        self.project.visibility = ProjectVisibility.PRIVATE
+        self.project.save(update_fields=['visibility'])
+
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': str(self.project.pk),
+                'message': 'I am interested in learning more',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_express_interest_unlisted_project_returns_404(self):
+        self.authenticate()
+        self.project.visibility = ProjectVisibility.UNLISTED
+        self.project.save(update_fields=['visibility'])
+
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': str(self.project.pk),
+                'message': 'I am interested in learning more',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_express_interest_non_investor_returns_403(self):
+        user = User.objects.create_user(
+            username='regular_user',
+            email='regular@example.com',
+            password='pass',
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            self.url,
+            {
+                'project_id': str(self.project.pk),
+                'message': 'I am interested in learning more',
+                'contact_opt_in': True,
+            },
+            format='json',
+        )
+
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
