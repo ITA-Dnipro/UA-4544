@@ -5,19 +5,38 @@ from django.utils import timezone
 from projects.models import PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES, Project
 from projects.serializers import ProjectCardSerializer
 from rest_framework import generics, status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import (
+    ListAPIView,
+)
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import (
+    SAFE_METHODS,
+    AllowAny,
+    BasePermission,
+    IsAuthenticated,
+)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from startups.models import StartupProfile
+from startups.models import Region, StartupProfile
 from startups.permissions import IsProfileOwnerOrAdmin
 from startups.serializers import (
+    RegionSerializer,
     StartupProfileUpdateSerializer,
     StartupPublicProfileSerializer,
 )
+
+
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, _view):
+        if request.method in SAFE_METHODS:
+            return True
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
 
 
 class StartupListView(generics.ListAPIView):
@@ -165,3 +184,16 @@ class PublishProfileView(APIView):
             {'detail': 'Profile published successfully.'},
             status=status.HTTP_200_OK,
         )
+
+
+class RegionListCreateView(generics.ListCreateAPIView):
+    queryset = Region.objects.all()
+    serializer_class = RegionSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+
+class RegionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Region.objects.all()
+    serializer_class = RegionSerializer
+    lookup_field = 'pk'
+    permission_classes = [IsAdminOrReadOnly]
