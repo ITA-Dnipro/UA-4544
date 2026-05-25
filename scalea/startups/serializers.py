@@ -1,10 +1,9 @@
-from django.utils.html import linebreaks
 from django.conf import settings
+from django.utils.html import linebreaks
 from rest_framework import serializers
+from uploads.services import validate_owned_upload_path
 
 from startups.models import StartupProfile
-from uploads.services import validate_owned_upload_path
-from uploads.utils import media_url_for_path
 
 
 class StartupPublicProfileSerializer(serializers.ModelSerializer):
@@ -12,7 +11,7 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     followers_count = serializers.SerializerMethodField(read_only=True)
     projects_count = serializers.SerializerMethodField(read_only=True)
-    logo_media_url = serializers.SerializerMethodField(read_only=True)
+    logo_url = serializers.SerializerMethodField(read_only=True)
     hero_media_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -51,18 +50,18 @@ class StartupPublicProfileSerializer(serializers.ModelSerializer):
 
     def get_projects_count(self, obj):
         return obj.projects_count
-    
+
     def _absolute_media(self, obj, attr):
         path = getattr(obj, attr) or ''
         if not path:
             return ''
         request = self.context.get('request')
-        relative = f"{settings.MEDIA_URL.rstrip('/')}/{path.lstrip('/')}"
+        relative = f'{settings.MEDIA_URL.rstrip("/")}/{path.lstrip("/")}'
         return request.build_absolute_uri(relative) if request else relative
-    
-    def get_logo_media_url(self, obj):
+
+    def get_logo_url(self, obj):
         return self._absolute_media(obj, 'logo_url')
-    
+
     def get_hero_media_url(self, obj):
         return self._absolute_media(obj, 'hero_image_url')
 
@@ -86,7 +85,7 @@ class StartupProfileUpdateSerializer(serializers.ModelSerializer):
         if not value:
             return ''
         return validate_owned_upload_path(value, self.context['request'].user)
-    
+
     def validate_hero_image_url(self, value):
         if not value:
             return ''

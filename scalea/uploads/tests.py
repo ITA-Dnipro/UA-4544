@@ -11,7 +11,15 @@ User = get_user_model()
 
 # Minimal valid file headers for python-magic / libmagic
 JPEG_BYTES = b'\xff\xd8\xff\xe0' + b'0' * 200
-PNG_BYTES = b'\x89PNG\r\n\x1a\n' + b'0' * 200
+PNG_BYTES = (
+    b'\x89PNG\r\n\x1a\n'
+    b'\x00\x00\x00\rIHDR'
+    b'\x00\x00\x00\x01'
+    b'\x00\x00\x00\x01'
+    b'\x08\x06\x00\x00\x00'
+    b'\x1f\x15\xc4\x89'
+    b'\x00\x00\x00\x00IEND\xaeB`\x82'
+)
 TEXT_BYTES = b'plain text content'
 
 
@@ -29,14 +37,21 @@ TEXT_BYTES = b'plain text content'
 class UploadAPITestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        # Change to username='...' if your User model has no email field
         cls.user = User.objects.create_user(
-            email='owner@test.com',
-            password='test-pass-123',
+            username='uploads_user',
+            email='uploads@example.com',
+            password='uploads123',
+            is_startup=True,
+            is_investor=False,
+            is_verified=True,
         )
         cls.other_user = User.objects.create_user(
-            email='other@test.com',
-            password='test-pass-123',
+            username='other_user',
+            email='uploads_other@example.com',
+            password='uploadsother123',
+            is_startup=True,
+            is_investor=False,
+            is_verified=True,
         )
 
     def setUp(self):
@@ -145,17 +160,13 @@ class UploadAPITestCase(APITestCase):
         self.assertIn('path', response.data)
 
     def test_delete_invalid_path_traversal(self):
-        response = self.client.delete(
-            f'{self.delete_url}?path=../etc/passwd'
-        )
+        response = self.client.delete(f'{self.delete_url}?path=../etc/passwd')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('path', response.data)
 
     def test_delete_invalid_path_leading_slash(self):
-        response = self.client.delete(
-            f'{self.delete_url}?path=/uploads/fake/logo.jpg'
-        )
+        response = self.client.delete(f'{self.delete_url}?path=/uploads/fake/logo.jpg')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 

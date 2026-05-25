@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'messages.apps.MessagesConfig',
     'dashboard',
     'tracking',
-    'uploads'
+    'uploads',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -233,4 +233,3 @@ UPLOAD_ALLOWED_MIME_TYPES = config(
     default='image/jpeg,image/png,image/svg+xml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     cast=Csv(),
 )
-

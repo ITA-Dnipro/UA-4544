@@ -1,5 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -9,9 +11,6 @@ from uploads.models import UploadedFile
 from uploads.permissions import IsUploadOwnerOrAdmin
 from uploads.serializers import UploadedFileResponseSerializer
 from uploads.validators import validate_upload_file
-
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
 
 
 class UploadCreateView(APIView):
@@ -65,7 +64,7 @@ class UploadDestroyByPathView(APIView):
         instance = get_object_or_404(UploadedFile, file=path)
 
         permission = IsUploadOwnerOrAdmin()
-        if not permission.has_object_permission(request, self, instance):
+        if not permission.has_object_permission(request, instance):
             raise PermissionDenied(detail=permission.message)
 
         if instance.file:

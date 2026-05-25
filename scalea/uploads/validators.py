@@ -24,8 +24,6 @@ def validate_upload_file(file_obj) -> str:
     max_size = settings.UPLOAD_MAX_SIZE_BYTES
     size = file_obj.size
     if size is None or size > max_size:
-        raise ValidationError(
-            f'File size exceeds maximum of {max_size} bytes.'
-        )
+        raise ValidationError(f'File size exceeds maximum of {max_size} bytes.')
 
     return mime_type

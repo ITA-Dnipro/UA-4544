@@ -326,6 +326,29 @@ This endpoint implements step 1. The confirm endpoint will validate the uid/toke
 
 ---
 
+### File uploads (Docker dev)
+Local media storage via the uploads app. Files live under `MEDIA_ROOT`; profiles reference them by relative path, not upload UUID.
+
+### .env
+`UPLOAD_ROOT=media`
+`MEDIA_URL=/media/`
+`UPLOAD_MAX_SIZE_BYTES=5242880`
+`UPLOAD_ALLOWED_MIME_TYPES=image/jpeg,image/png,image/svg+xml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document``
+
+Add `media/` to `.gitignore`.
+
+#### Docker
+Image: libmagic1 must be installed in Dockerfile.backend (for python-magic).
+
+### API (JWT required)
+|Method|Endpoint|Notes|
+| -------- | ------- | ------- |
+|POST|/api/uploads/|form-data, field file → { path, mime_type, size }
+|DELETE|/api/uploads/delete/?path=<relative-path>|Owner or staff only
+|PATCH|/api/startups/<id>/|Set logo_url / hero_image_url to upload path
+
+Files are served at http://localhost:8000/media/<path> when DEBUG=True.
+
 ### Basic Epics
 
 0. **As a user of the platform**, I want the ability to represent both as a startup and as an investor company, so that I can engage in the platform's ecosystem from both perspectives using a single account.

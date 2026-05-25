@@ -33,7 +33,7 @@ class UploadedFile(models.Model):
 
     def __str__(self):
         return f'{self.original_name} ({self.id})'
-    
+
     @property
     def relative_path(self) -> str:
         return self.file.name  # already relative to MEDIA_ROOT
