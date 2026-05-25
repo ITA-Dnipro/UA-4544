@@ -93,4 +93,20 @@ class Migration(migrations.Migration):
                 name="tracking_target_type_matches_fk",
             ),
         ),
+        migrations.AddConstraint(
+            model_name="tracking",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("project__isnull", False)),
+                fields=("investor", "target_type", "project"),
+                name="uniq_tracking_investor_project",
+            ),
+        ),
+        migrations.AddConstraint(
+            model_name="tracking",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("startup__isnull", False)),
+                fields=("investor", "target_type", "startup"),
+                name="uniq_tracking_investor_startup",
+            ),
+        ),
     ]
