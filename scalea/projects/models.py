@@ -66,6 +66,7 @@ class Project(models.Model):
         validators=[MinValueValidator(Decimal('0'))],
     )
     currency = models.CharField(max_length=3, default='UAH')
+    tags = models.JSONField(default=list, blank=True)
 
     visibility = models.CharField(
         max_length=16,

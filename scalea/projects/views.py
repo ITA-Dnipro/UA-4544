@@ -79,16 +79,28 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     return qs
 
                 return qs.filter(
-                    models.Q(visibility=ProjectVisibility.PUBLIC)
+                    models.Q(
+                        visibility=ProjectVisibility.PUBLIC,
+                        startup__is_published=True,
+                    )
                     | models.Q(startup__user=user)
                 ).distinct()
 
-            return qs.filter(models.Q(visibility=ProjectVisibility.PUBLIC))
+            return qs.filter(
+                models.Q(
+                    visibility=ProjectVisibility.PUBLIC,
+                    startup__is_published=True,
+                )
+            )
 
         return qs
 
     def perform_create(self, serializer):
         serializer.save(startup=self.request.user.startupprofile)
+
+    def perform_destroy(self, instance):
+        instance.deleted_at = timezone.now()
+        instance.save(update_fields=['deleted_at', 'updated_at'])
 
 
 class AdminProjectListView(ListAPIView):

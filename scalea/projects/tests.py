@@ -64,7 +64,7 @@ class ProjectAPITests(APITestCase):
             username='owner', is_startup=True, is_org_admin=True, email='owner@test.com'
         )
         self.profile = StartupProfile.objects.create(
-            user=self.owner, company_name='Owner Startup'
+            user=self.owner, company_name='Owner Startup', is_published=True
         )
 
         self.project = Project.objects.create(
@@ -84,6 +84,81 @@ class ProjectAPITests(APITestCase):
 
         self.list_url = reverse('project-list')
         self.detail_url = reverse('project-detail', kwargs={'pk': self.project.id})
+        self.startup_projects_url = reverse(
+            'startup-projects',
+            kwargs={'pk': self.profile.pk},
+        )
+
+    def test_owner_can_create_project_under_startup(self):
+        self.client.force_authenticate(user=self.owner)
+        payload = {
+            'title': 'Handmade Chairs',
+            'short_description': 'Oak chairs...',
+            'description': '<p>full HTML</p>',
+            'target_amount': '50000.00',
+            'currency': 'UAH',
+            'tags': ['wood', 'furniture'],
+            'visibility': ProjectVisibility.PUBLIC,
+        }
+
+        response = self.client.post(self.startup_projects_url, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('Location', response)
+        self.assertEqual(response.data['title'], 'Handmade Chairs')
+        self.assertEqual(response.data['tags'], ['wood', 'furniture'])
+
+        project = Project.objects.get(title='Handmade Chairs')
+        self.assertEqual(project.startup, self.profile)
+
+    def test_anonymous_create_project_under_startup_returns_401(self):
+        response = self.client.post(
+            self.startup_projects_url,
+            {
+                'title': 'Anonymous Project',
+                'description': 'No auth',
+                'target_amount': '1000.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_non_owner_create_project_under_startup_returns_403(self):
+        self.client.force_authenticate(user=self.investor)
+        response = self.client.post(
+            self.startup_projects_url,
+            {
+                'title': 'Not Mine',
+                'description': 'Forbidden',
+                'target_amount': '1000.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_org_admin_can_create_project_under_startup(self):
+        org_admin = User.objects.create_user(
+            username='project_org_admin',
+            email='project-org-admin@test.com',
+            is_org_admin=True,
+        )
+        self.client.force_authenticate(user=org_admin)
+
+        response = self.client.post(
+            self.startup_projects_url,
+            {
+                'title': 'Created By Org Admin',
+                'description': 'Org admin project',
+                'target_amount': '1000.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        project = Project.objects.get(title='Created By Org Admin')
+        self.assertEqual(project.startup, self.profile)
 
     def test_create_project_restricted_to_startups(self):
         self.client.force_authenticate(user=self.investor)
@@ -123,6 +198,53 @@ class ProjectAPITests(APITestCase):
 
         response = self.client.patch(self.detail_url, {'title': 'Hacked Title'})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_owner_can_patch_project(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.patch(
+            self.detail_url,
+            {'title': 'Updated Project', 'tags': ['updated']},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['title'], 'Updated Project')
+        self.assertEqual(response.data['tags'], ['updated'])
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, 'Updated Project')
+
+    def test_org_admin_can_patch_project(self):
+        org_admin = User.objects.create_user(
+            username='org_admin',
+            email='org-admin@test.com',
+            is_org_admin=True,
+        )
+        self.client.force_authenticate(user=org_admin)
+
+        response = self.client.patch(
+            self.detail_url,
+            {'title': 'Updated By Org Admin'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, 'Updated By Org Admin')
+
+    def test_delete_soft_deletes_project(self):
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(self.detail_url)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.project.refresh_from_db()
+        self.assertIsNotNone(self.project.deleted_at)
+
+        self.client.logout()
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_private_project_visibility(self):
         private_project = Project.objects.create(
