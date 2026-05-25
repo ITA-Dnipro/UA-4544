@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# install libmagic1 for python-magic image processing lib to work 
+RUN apt-get update && apt-get install -y libmagic1
+
 # Install Python dependencies first (layer cache)
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .

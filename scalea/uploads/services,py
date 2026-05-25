@@ -1,0 +1,27 @@
+from django.core.exceptions import ValidationError
+from uploads.models import UploadedFile
+
+
+def normalize_media_path(value: str) -> str:
+    path = (value or '').strip()
+    if not path:
+        return ''
+    if '..' in path or path.startswith('/'):
+        raise ValidationError('Invalid media path.')
+    return path
+
+
+def validate_owned_upload_path(path: str, user) -> str:
+    path = normalize_media_path(path)
+    if not path:
+        return ''
+
+    qs = UploadedFile.objects.filter(file=path)
+    if user.is_staff or user.is_superuser:
+        if not qs.exists():
+            raise ValidationError('Upload not found for this path.')
+        return path
+
+    if not qs.filter(uploaded_by=user).exists():
+        raise ValidationError('You do not have permission to use this file.')
+    return path

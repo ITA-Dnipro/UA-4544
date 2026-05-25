@@ -216,3 +216,6 @@ __marimo__/
 .DS_Store/
 **/.DS_Store
 node_modules/
+
+# Media folder
+/media 

@@ -233,7 +233,4 @@ UPLOAD_ALLOWED_MIME_TYPES = config(
     default='image/jpeg,image/png,image/svg+xml,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     cast=Csv(),
 )
-def media_url_for_path(relative_path: str) -> str:
-    base = MEDIA_URL.rstrip('/')
-    path = relative_path.lstrip('/')
-    return f'{base}/{path}'
+
