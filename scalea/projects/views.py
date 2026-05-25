@@ -184,5 +184,7 @@ class AdminProjectModerationViewSet(viewsets.GenericViewSet):
             )
 
             if action_name == 'reject':
-                send_project_rejected_email(project, reason)
+                transaction.on_commit(
+                    lambda: send_project_rejected_email(project, reason)
+                )
         return Response(AdminProjectSerializer(project).data)
