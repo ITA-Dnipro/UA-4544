@@ -56,3 +56,59 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         return Tracking.objects.filter(
             investor=investor, target_type=TrackingTargetType.PROJECT, project=obj
         ).exists()
+
+
+class AdminProjectSerializer(serializers.ModelSerializer):
+    startup_email = serializers.EmailField(source='startup.user.email', read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            'id',
+            'title',
+            'slug',
+            'status',
+            'visibility',
+            'moderation_status',
+            'moderation_reason',
+            'deleted_at',
+            'startup',
+            'startup_email',
+            'created_at',
+            'updated_at',
+            'last_moderated_at',
+        ]
+
+
+class ProjectModerateSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(
+        choices=['approve', 'reject', 'flag', 'delete', 'restore', 'set_visibility']
+    )
+    reason = serializers.CharField(required=False, allow_blank=False)
+    visibility = serializers.ChoiceField(
+        choices=[choice[0] for choice in Project._meta.get_field('visibility').choices],
+        required=False,
+    )
+
+    def validate(self, attrs):
+        action = attrs['action']
+        reason = attrs.get('reason')
+        visibility = attrs.get('visibility')
+
+        if action == 'reject' and not reason:
+            raise serializers.ValidationError({'reason': 'This field is required.'})
+
+        if action == 'set_visibility' and not visibility:
+            raise serializers.ValidationError({'visibility': 'This field is required.'})
+
+        if action != 'set_visibility' and visibility is not None:
+            raise serializers.ValidationError(
+                {'visibility': 'Visibility is only allowed for set_visibility action.'}
+            )
+
+        if action != 'reject' and reason is not None:
+            raise serializers.ValidationError(
+                {'reason': 'Reason is only allowed for reject action.'}
+            )
+
+        return attrs

@@ -6,3 +6,12 @@ class IsSuperAdmin(BasePermission):
         return bool(
             request.user and request.user.is_authenticated and request.user.is_superuser
         )
+
+
+class IsOrgAdmin(BasePermission):
+    def has_permission(self, request, _view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_org_admin or request.user.is_superuser)
+        )

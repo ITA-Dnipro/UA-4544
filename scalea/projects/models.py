@@ -33,6 +33,13 @@ class ProjectVisibility(models.TextChoices):
     UNLISTED = 'unlisted', 'Unlisted'
 
 
+class ProjectModerationStatus(models.TextChoices):
+    PENDING = 'pending', 'Pending'
+    APPROVED = 'approved', 'Approved'
+    REJECTED = 'rejected', 'Rejected'
+    FLAGGED = 'flagged', 'Flagged'
+
+
 class Project(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     startup = models.ForeignKey(
@@ -65,6 +72,14 @@ class Project(models.Model):
         choices=ProjectVisibility.choices,
         default=ProjectVisibility.PUBLIC,
     )
+    moderation_status = models.CharField(
+        max_length=16,
+        choices=ProjectModerationStatus.choices,
+        default=ProjectModerationStatus.PENDING,
+    )
+    moderation_reason = models.TextField(blank=True)
+    last_moderated_at = models.DateTimeField(null=True, blank=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
