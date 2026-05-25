@@ -1,13 +1,25 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from projects.models import Project
 from rest_framework import status
 from rest_framework.test import APITestCase
+from users.models import ProfileAudit
 
 from startups.models import Region, StartupProfile
 
 User = get_user_model()
+
+
+def _profile_audits(profile):
+    return ProfileAudit.objects.filter(
+        content_type=ContentType.objects.get_for_model(profile),
+        object_id=profile.pk,
+    )
 
 
 def _make_user(username, email, **kwargs):
@@ -546,3 +558,130 @@ class RegionAPITests(APITestCase):
                 status.HTTP_403_FORBIDDEN,
             ],
         )
+
+
+class ProfileAuditAPITests(APITestCase):
+    def setUp(self):
+        self.owner = _make_user('audit_owner', 'audit_owner@test.com')
+        self.profile = _make_startup(
+            self.owner,
+            company_name='Audit Startup',
+            description='Initial description',
+            contact_email='owner@test.com',
+            is_published=False,
+        )
+        self.stranger = _make_user('audit_stranger', 'audit_stranger@test.com')
+        self.detail_url = reverse('profile-detail', kwargs={'pk': self.owner.pk})
+        self.publish_url = reverse('startup-publish', kwargs={'pk': self.profile.pk})
+        self.history_url = reverse(
+            'startup-profile-history',
+            kwargs={'pk': self.profile.pk},
+        )
+        self.revert_url = reverse(
+            'startup-profile-revert',
+            kwargs={'pk': self.profile.pk},
+        )
+
+    def test_update_creates_audit_entry_with_old_and_new_values(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.patch(
+            self.detail_url,
+            {'company_name': 'Renamed Startup'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        audit = _profile_audits(self.profile).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.user, self.owner)
+        self.assertEqual(
+            audit.changes['company_name'],
+            {'old': 'Audit Startup', 'new': 'Renamed Startup'},
+        )
+
+    def test_publish_creates_audit_entry(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(self.publish_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        audit = _profile_audits(self.profile).first()
+        self.assertIsNotNone(audit)
+        self.assertIn('is_published', audit.changes)
+        self.assertEqual(
+            audit.changes['is_published'],
+            {'old': False, 'new': True},
+        )
+
+    def test_history_endpoint_returns_paginated_entries(self):
+        ProfileAudit.objects.create(
+            profile=self.profile,
+            user=self.owner,
+            changes={'company_name': {'old': 'A', 'new': 'B'}},
+        )
+        ProfileAudit.objects.create(
+            profile=self.profile,
+            user=self.owner,
+            changes={'description': {'old': 'D1', 'new': 'D2'}},
+        )
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(self.history_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('count', response.data)
+        self.assertIn('results', response.data)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['profile_type'], 'startupprofile')
+        self.assertEqual(response.data['results'][0]['profile_id'], self.profile.pk)
+
+    def test_history_endpoint_returns_newest_first(self):
+        older = ProfileAudit.objects.create(
+            profile=self.profile,
+            user=self.owner,
+            changes={'company_name': {'old': 'Old', 'new': 'Mid'}},
+        )
+        newer = ProfileAudit.objects.create(
+            profile=self.profile,
+            user=self.owner,
+            changes={'company_name': {'old': 'Mid', 'new': 'New'}},
+        )
+        ProfileAudit.objects.filter(pk=older.pk).update(
+            timestamp=timezone.now() - timedelta(minutes=1)
+        )
+        ProfileAudit.objects.filter(pk=newer.pk).update(timestamp=timezone.now())
+
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(self.history_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = [item['id'] for item in response.data['results']]
+        self.assertEqual(returned_ids[:2], [newer.id, older.id])
+
+    def test_revert_one_step_restores_fields_and_creates_audit(self):
+        self.client.force_authenticate(user=self.owner)
+        self.client.patch(
+            self.detail_url,
+            {'company_name': 'Renamed Startup'},
+            format='json',
+        )
+
+        response = self.client.post(self.revert_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.company_name, 'Audit Startup')
+        self.assertEqual(_profile_audits(self.profile).count(), 2)
+
+    def test_revert_is_owner_only(self):
+        self.client.force_authenticate(user=self.owner)
+        self.client.patch(
+            self.detail_url,
+            {'company_name': 'Renamed Startup'},
+            format='json',
+        )
+
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.post(self.revert_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

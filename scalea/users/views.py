@@ -43,8 +43,9 @@ from .metrics import (
     inc_reset_expired_attempt,
     inc_reset_reused_attempt,
 )
-from .models import PasswordResetAudit
+from .models import PasswordResetAudit, ProfileAudit
 from .permissions import IsSuperAdmin
+from .profile_audit import _build_changes, _profile_snapshot
 from .security import (
     clear_login_failures,
     is_login_locked,
@@ -533,8 +534,21 @@ class UniversalProfileDetailView(generics.RetrieveUpdateAPIView):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
+        is_auditable_profile = isinstance(instance, (StartupProfile, InvestorProfile))
+        before = _profile_snapshot(instance) if is_auditable_profile else None
+
         with transaction.atomic():
             serializer.save()
+            if is_auditable_profile:
+                instance.refresh_from_db()
+                after = _profile_snapshot(instance)
+                changes = _build_changes(before, after)
+                if changes:
+                    ProfileAudit.objects.create(
+                        profile=instance,
+                        user=request.user if request.user.is_authenticated else None,
+                        changes=changes,
+                    )
 
         instance = self.get_object()
         if isinstance(instance, StartupProfile):

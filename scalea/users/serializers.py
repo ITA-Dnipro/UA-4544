@@ -8,6 +8,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from startups.models import StartupProfile
 
+from .models import ProfileAudit
+
 User = get_user_model()
 
 
@@ -206,3 +208,26 @@ class AdminUserModerationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'email', 'is_org_admin', 'is_verified', 'created_at')
+
+
+class ProfileAuditSerializer(serializers.ModelSerializer):
+    user_id = serializers.SerializerMethodField()
+    profile_id = serializers.IntegerField(source='object_id', read_only=True)
+    profile_type = serializers.SerializerMethodField()
+
+    def get_user_id(self, obj):
+        return obj.user_id
+
+    def get_profile_type(self, obj):
+        return obj.content_type.model
+
+    class Meta:
+        model = ProfileAudit
+        fields = [
+            'id',
+            'profile_type',
+            'profile_id',
+            'user_id',
+            'timestamp',
+            'changes',
+        ]

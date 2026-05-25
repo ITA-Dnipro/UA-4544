@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -10,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 from startups.models import StartupProfile
 from tracking.models import PortfolioSnapshot, Tracking, TrackingTargetType
+from users.models import ProfileAudit
 
 from investors.models import (
     Investment,
@@ -21,6 +23,13 @@ from investors.models import (
 from investors.serializers import SavedItemCardSerializer
 
 User = get_user_model()
+
+
+def _profile_audits(profile):
+    return ProfileAudit.objects.filter(
+        content_type=ContentType.objects.get_for_model(profile),
+        object_id=profile.pk,
+    )
 
 
 class InvestorProfileModelTests(TestCase):
@@ -140,6 +149,45 @@ class InvestorProfileAPITests(APITestCase):
 
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.company_name, 'Updated Alpha VC')
+
+        audit = _profile_audits(self.profile).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.user, self.owner_user)
+        self.assertEqual(
+            audit.changes['company_name'],
+            {'old': 'Alpha VC', 'new': 'Updated Alpha VC'},
+        )
+
+    def test_investor_history_endpoint_returns_audit_entries(self):
+        ProfileAudit.objects.create(
+            profile=self.profile,
+            user=self.owner_user,
+            changes={'bio': {'old': 'Old bio', 'new': 'New bio'}},
+        )
+        url = reverse('investor-profile-history', kwargs={'pk': self.profile.pk})
+
+        self.client.force_authenticate(user=self.owner_user)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(
+            response.data['results'][0]['profile_type'],
+            'investorprofile',
+        )
+        self.assertEqual(response.data['results'][0]['profile_id'], self.profile.pk)
+
+    def test_investor_revert_restores_latest_change(self):
+        self.client.force_authenticate(user=self.owner_user)
+        self.client.patch(self.url, {'bio': 'Updated investor bio'}, format='json')
+        url = reverse('investor-profile-revert', kwargs={'pk': self.profile.pk})
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.bio, 'Early-stage tech focus.')
+        self.assertEqual(_profile_audits(self.profile).count(), 2)
 
     def test_owner_can_put_investor_profile(self):
         self.client.force_authenticate(user=self.owner_user)

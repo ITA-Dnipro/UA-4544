@@ -19,7 +19,11 @@ from dashboard.views import LandingContentAPIView
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-from startups.views import PublishProfileView
+from startups.views import (
+    ProfileHistoryView,
+    PublishProfileView,
+    RevertProfileOneStepView,
+)
 from tracking.views import InterestCreateAPIView, InvestorTrackingListView
 from users.views import UniversalProfileDetailView
 
@@ -50,6 +54,26 @@ urlpatterns = [
                     '<int:pk>/',
                     UniversalProfileDetailView.as_view(),
                     name='profile-detail',
+                ),
+                path(
+                    'startup/<int:pk>/history/',
+                    ProfileHistoryView.as_view(profile_type='startup'),
+                    name='startup-profile-history',
+                ),
+                path(
+                    'startup/<int:pk>/revert/',
+                    RevertProfileOneStepView.as_view(profile_type='startup'),
+                    name='startup-profile-revert',
+                ),
+                path(
+                    'investor/<int:pk>/history/',
+                    ProfileHistoryView.as_view(profile_type='investor'),
+                    name='investor-profile-history',
+                ),
+                path(
+                    'investor/<int:pk>/revert/',
+                    RevertProfileOneStepView.as_view(profile_type='investor'),
+                    name='investor-profile-revert',
                 ),
             ]
         ),
