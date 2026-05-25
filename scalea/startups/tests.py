@@ -137,7 +137,7 @@ class StartupProjectListAPITests(TestCase):
 
     def setUp(self):
         self.user = _make_user('projuser', 'proj@example.com')
-        self.startup = _make_startup(self.user, company_name='Projects Corp')
+        self.startup = _make_published_startup(self.user, company_name='Projects Corp')
         self.url = reverse('startup-projects', kwargs={'pk': self.startup.pk})
 
     def _url(self, startup_pk):

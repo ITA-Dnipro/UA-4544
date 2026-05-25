@@ -5,8 +5,13 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from investors.models import InvestorProfile
-from projects.models import PROJECT_ACTIVE_STATUSES, PROJECT_INACTIVE_STATUSES, Project
-from projects.serializers import ProjectCardSerializer
+from projects.models import (
+    PROJECT_ACTIVE_STATUSES,
+    PROJECT_INACTIVE_STATUSES,
+    Project,
+    ProjectVisibility,
+)
+from projects.serializers import ProjectCardSerializer, ProjectDetailSerializer
 from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
@@ -18,6 +23,7 @@ from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from users.models import ProfileAudit
 from users.profile_audit import (
@@ -121,14 +127,49 @@ class ProjectCardPagination(PageNumberPagination):
     max_page_size = 100
 
 
-class StartupProjectListView(ListAPIView):
-    serializer_class = ProjectCardSerializer
+class StartupProjectListView(generics.ListCreateAPIView):
     pagination_class = ProjectCardPagination
 
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return ProjectDetailSerializer
+        return ProjectCardSerializer
+
+    def get_startup(self):
+        return get_object_or_404(StartupProfile, pk=self.kwargs['pk'])
+
+    def can_manage_projects(self, startup):
+        user = self.request.user
+        return bool(
+            user.is_authenticated
+            and (
+                startup.user == user
+                or user.is_org_admin
+                or user.is_staff
+                or user.is_superuser
+            )
+        )
+
+    def can_create_project(self, startup):
+        user = self.request.user
+        return bool(
+            user.is_authenticated
+            and (
+                startup.user == user
+                or user.is_org_admin
+                or user.is_staff
+                or user.is_superuser
+            )
+        )
+
     def get_queryset(self):
-        startup_id = self.kwargs['pk']
-        startup = get_object_or_404(StartupProfile, pk=startup_id)
-        qs = Project.objects.filter(startup=startup)
+        startup = self.get_startup()
+        qs = Project.objects.filter(startup=startup, deleted_at__isnull=True)
+
+        if not self.can_manage_projects(startup):
+            if not startup.is_published:
+                return Project.objects.none()
+            qs = qs.filter(visibility=ProjectVisibility.PUBLIC)
 
         status_param = self.request.query_params.get('status', '').lower()
         if status_param == 'active':
@@ -137,6 +178,37 @@ class StartupProjectListView(ListAPIView):
             qs = qs.filter(status__in=PROJECT_INACTIVE_STATUSES)
 
         return qs.order_by('-created_at')
+
+    def create(self, request, *_args, **_kwargs):
+        startup = self.get_startup()
+
+        if not request.user or not request.user.is_authenticated:
+            return Response(
+                {'detail': 'Authentication credentials were not provided.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not self.can_create_project(startup):
+            return Response(
+                {'detail': 'You can only create projects for your own startup.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        project = serializer.save(startup=startup)
+        headers = {
+            'Location': reverse(
+                'project-detail',
+                kwargs={'pk': project.pk},
+                request=request,
+            )
+        }
+        return Response(
+            ProjectDetailSerializer(project, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
 
 def _get_missing_fields(profile):

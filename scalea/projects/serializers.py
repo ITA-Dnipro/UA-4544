@@ -37,10 +37,20 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'target_amount',
             'raised_amount',
             'currency',
+            'tags',
             'visibility',
             'is_tracked',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'slug', 'raised_amount']
+        read_only_fields = [
+            'id',
+            'startup',
+            'slug',
+            'raised_amount',
+            'created_at',
+            'updated_at',
+        ]
 
     def get_is_tracked(self, obj):
         request = self.context.get('request')
